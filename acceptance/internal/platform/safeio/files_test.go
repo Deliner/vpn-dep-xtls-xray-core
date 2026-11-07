@@ -5,6 +5,7 @@ package safeio_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -17,6 +18,35 @@ func TestReadRejectsSpecialFiles(t *testing.T) {
 		if _, err := safeio.Read(path, 100); err == nil {
 			t.Errorf("accepted non-regular file %s", path)
 		}
+	}
+}
+
+func TestCreatePublishesOnlyOneConcurrentWriter(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "profile.json")
+	winners := make(chan string, 16)
+	for index := range 16 {
+		go func() {
+			value := strconv.Itoa(index)
+			if err := safeio.Create(path, []byte(value), 0600); err != nil {
+				winners <- ""
+			} else {
+				winners <- value
+			}
+		}()
+	}
+	var winner string
+	count := 0
+	for range 16 {
+		if value := <-winners; value != "" {
+			winner, count = value, count+1
+		}
+	}
+	actual, err := os.ReadFile(path)
+	if err != nil || count != 1 || string(actual) != winner {
+		t.Fatalf("concurrent publication changed the winning file: %d %q %q %v", count, winner, actual, err)
+	}
+	if err := safeio.NewJSON(path, map[string]string{"changed": "yes"}); err == nil {
+		t.Fatal("existing imported profile was overwritten")
 	}
 }
 

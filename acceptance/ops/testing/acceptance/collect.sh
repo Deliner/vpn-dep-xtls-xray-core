@@ -22,6 +22,11 @@ if [[ "$suite" == cronet ]]; then
     (cd "$report"; shasum -a 256 --check evidence.sha256) > "$report/integrity-verification.log"
     (cd "$report"; shasum -a 256 --check SHA256SUMS) >> "$report/integrity-verification.log"
     cmp "$report/source.tsv" <(sed '/^#/d' "$acceptance_checkout/acceptance/ops/runtime/cronet/source.tsv")
+    if [[ -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet-verify.sh" ]]; then
+      verification="$collection/cronet-native-$arch"
+      [[ "$(cat "$verification/status")" == passed && -s "$verification/range.log" ]] || exit 1
+      (cd "$verification"; shasum -a 256 --check evidence.sha256) > "$verification/integrity-verification.log"
+    fi
   done
   printf 'build-evidence-verified\n' > "$acceptance_output/status"
   printf 'Native build evidence verified; ABI/payload/CVE acceptance remains open: %s\n' "$collection"

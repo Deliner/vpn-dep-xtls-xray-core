@@ -32,3 +32,8 @@ cronet-review-input component:
 [group('runtime')]
 cronet-build target output:
     @bash ops/quality/check.sh static-analysis bash ops/runtime/cronet/build.sh "$1" "$2"
+
+# Execute Cronet's overlong HTTP range regression with a verified native build in the owned Linux VM.
+[group('runtime')]
+cronet-range-test candidate:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/cronet/range.sh "$1"

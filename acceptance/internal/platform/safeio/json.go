@@ -35,15 +35,31 @@ func Digest(value any) (string, error) {
 }
 
 func JSON(path string, value any) error {
-	raw, err := Encode(value)
+	raw, err := formattedJSON(value)
 	if err != nil {
 		return err
 	}
-	var formatted bytes.Buffer
-	if err := json.Indent(&formatted, raw, "", "  "); err != nil {
+	return Atomic(path, raw, 0600)
+}
+
+func NewJSON(path string, value any) error {
+	raw, err := formattedJSON(value)
+	if err != nil {
 		return err
 	}
-	return Atomic(path, append(formatted.Bytes(), '\n'), 0600)
+	return Create(path, raw, 0600)
+}
+
+func formattedJSON(value any) ([]byte, error) {
+	raw, err := Encode(value)
+	if err != nil {
+		return nil, err
+	}
+	var formatted bytes.Buffer
+	if err := json.Indent(&formatted, raw, "", "  "); err != nil {
+		return nil, err
+	}
+	return append(formatted.Bytes(), '\n'), nil
 }
 
 func LoadJSON(path string, value any) error {

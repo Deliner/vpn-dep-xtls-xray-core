@@ -18,6 +18,11 @@ acceptance-run arch:
 acceptance-cronet-run arch:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet.sh "$1"
 
+# Verify native CPU and execute the compiled Cronet regression from a checksum-verified CI artifact.
+[group('acceptance')]
+acceptance-cronet-verify arch candidate:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet-verify.sh "$1" "$2"
+
 # Download a completed matching CI run, restore captured Actions policy and independently verify its evidence.
 [group('acceptance')]
 acceptance-collect directory run_id:

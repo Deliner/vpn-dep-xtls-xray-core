@@ -34,3 +34,38 @@ jobs:
           path: acceptance/build/acceptance-results
           if-no-files-found: error
           retention-days: 30
+  native-range:
+    name: Native Cronet regression ${{ matrix.arch }}
+    needs: cronet
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Bootstrap pinned tools
+        working-directory: acceptance
+        run: bash ops/environment/bootstrap.sh
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cronet-linux-${{ matrix.arch }}
+          path: acceptance/build/cronet-artifact
+      - name: Verify artifact and run range regression on actual target CPU
+        working-directory: acceptance
+        run: build/tools/bin/just acceptance-cronet-verify '${{ matrix.arch }}' build/cronet-artifact
+      - name: Preserve native verification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: cronet-native-${{ matrix.arch }}
+          path: acceptance/build/cronet-native-verification
+          if-no-files-found: error
+          retention-days: 30

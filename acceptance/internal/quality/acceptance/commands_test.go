@@ -25,6 +25,12 @@ case "$*" in
   'api --hostname github.com --method PUT '*'/workflows/'*'/disable')
     [[ "${CI_TEST_DISABLE_FAILURE:-0}" == 0 ]] || exit 17 ;;
   'api --hostname github.com --method PUT '*'/actions/permissions -F enabled=true') ;;
+  'api --hostname github.com --method PUT '*'/actions/permissions --input '*) ;;
+  'api --hostname github.com '*'/workflows/101 --jq '*)
+    printf 'disabled_manually\t.github/workflows/upstream.yml\n' ;;
+  'api --hostname github.com '*'/workflows/102 --jq '*)
+    printf 'disabled_fork\t.github/workflows/other.yml\n' ;;
+  'api --hostname github.com --method PUT '*'/workflows/101/enable') ;;
   'api --hostname github.com --method PUT '*'/workflows/303/enable') ;;
   *) printf 'Unexpected test API request\n' >&2; exit 2 ;;
 esac

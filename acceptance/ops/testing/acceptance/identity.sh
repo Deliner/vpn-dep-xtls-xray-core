@@ -26,6 +26,15 @@ acceptance_restore_actions() {
     --input "$acceptance_output/actions-before.json"
   while IFS=$'\t' read -r workflow_id workflow_state workflow_path; do
     [[ "$workflow_id" =~ ^[0-9]+$ ]] || return 2
+    local current_state current_path
+    IFS=$'\t' read -r current_state current_path < <(gh api --hostname github.com \
+      "repos/$acceptance_repo/actions/workflows/$workflow_id" --jq '[.state,.path]|@tsv')
+    [[ "$current_path" == "$workflow_path" ]] || return 2
+    case "$workflow_state:$current_state" in
+      active:active|disabled_*:disabled_*) continue ;;
+      active:disabled_*|disabled_*:active) ;;
+      *) printf 'Unknown workflow state transition: %s -> %s\n' "$current_state" "$workflow_state" >&2; return 2 ;;
+    esac
     if [[ "$workflow_state" == active ]]; then
       gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/workflows/$workflow_id/enable"
     else

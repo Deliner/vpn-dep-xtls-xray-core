@@ -98,7 +98,7 @@ func Dependencies(directory string, manifest model.Deployment) (map[string][]str
 	if err := safeio.LoadJSON(path, &profiles); err != nil {
 		return nil, err
 	}
-	if profiles.SchemaVersion != 1 || profiles.TopologyID != manifest.TopologyID || len(profiles.Routes) == 0 {
+	if (profiles.SchemaVersion != 1 && profiles.SchemaVersion != model.ClientProfilesVersion) || profiles.TopologyID != manifest.TopologyID || len(profiles.Routes) == 0 {
 		return nil, fmt.Errorf("invalid deployment route metadata; render again")
 	}
 	order, edges, used := map[string]int{}, map[string]map[string]bool{}, map[string]bool{}

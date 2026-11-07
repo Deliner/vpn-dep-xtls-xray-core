@@ -27,8 +27,11 @@ build:
     mkdir -p build/bin
     go build -trimpath -buildvcs=false -o build/bin/nhop ./cmd/nhop
     go build -trimpath -buildvcs=false -o build/bin/nhop-node ./cmd/nhop-node
+    go build -trimpath -buildvcs=false -o build/bin/nhop-client ./cmd/nhop-client
     GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o build/bin/nhop-node-linux-amd64 ./cmd/nhop-node
     GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o build/bin/nhop-node-linux-arm64 ./cmd/nhop-node
+    GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o build/bin/nhop-client-linux-amd64 ./cmd/nhop-client
+    GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o build/bin/nhop-client-linux-arm64 ./cmd/nhop-client
 
 # Complete local acceptance check; no SSH, installation or firewall changes.
 [group('development')]

@@ -41,4 +41,7 @@ done
 if [[ "$arch" == arm64 ]]; then just cronet-review-input sysroot-linux-arm64 >> "$report/input-review.log" 2>&1; fi
 just cronet-build "linux/$arch" "build/native-candidates/cronet-linux-$arch" > "$report/driver.log" 2>&1
 readelf --file-header --dynamic --dyn-syms --wide "$work/bin/libcronet.so" > "$work/inspection/elf.txt"
+GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOFLAGS=-mod=readonly \
+  go -C "$work/source/test" test -c -tags with_purego -trimpath -buildvcs=false -o "$work/bin/range.test" .
+(cd "$work"; shasum -a 256 bin/range.test) >> "$work/SHA256SUMS"
 printf 'Native build only; ABI execution, CVE triage and payload acceptance remain separate.\n' > "$report/limitations.txt"

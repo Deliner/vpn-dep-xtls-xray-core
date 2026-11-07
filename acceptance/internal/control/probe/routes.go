@@ -19,7 +19,7 @@ func clients(directory string) (map[string]ClientCase, error) {
 	if err := safeio.LoadJSON(filepath.Join(directory, "client-profiles.json"), &profiles); err != nil {
 		return nil, err
 	}
-	if profiles.SchemaVersion != 1 || len(profiles.Routes) == 0 {
+	if (profiles.SchemaVersion != 1 && profiles.SchemaVersion != model.ClientProfilesVersion) || len(profiles.Routes) == 0 {
 		return nil, fmt.Errorf("invalid client profiles schema")
 	}
 	result := map[string]ClientCase{}

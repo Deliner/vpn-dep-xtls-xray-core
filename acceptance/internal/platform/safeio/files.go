@@ -74,6 +74,23 @@ func Atomic(path string, contents []byte, mode os.FileMode) error {
 	return SyncDir(filepath.Dir(path))
 }
 
+// Create publishes a complete new file without replacing an existing directory
+// entry, including a symlink or a concurrently created regular file.
+func Create(path string, contents []byte, mode os.FileMode) error {
+	file, err := os.CreateTemp(filepath.Dir(path), ".nhop-")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	if err := writeFile(file, contents, mode); err != nil {
+		return err
+	}
+	if err := os.Link(file.Name(), path); err != nil {
+		return err
+	}
+	return SyncDir(filepath.Dir(path))
+}
+
 func writeFile(file *os.File, contents []byte, mode os.FileMode) error {
 	defer file.Close()
 	if err := file.Chmod(mode); err != nil {

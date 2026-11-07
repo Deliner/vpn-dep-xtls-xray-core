@@ -23,7 +23,7 @@ func renderClient(topology *model.Topology, name, directory string, state model.
 }
 
 func renderClients(topology *model.Topology, directory string, state model.Secrets) (string, error) {
-	profiles := model.Profiles{SchemaVersion: 1, TopologyID: topology.Name, Routes: map[string]model.Profile{}}
+	profiles := model.Profiles{SchemaVersion: model.ClientProfilesVersion, TopologyID: topology.Name, Routes: map[string]model.Profile{}}
 	var lines []string
 	for _, name := range topology.Order {
 		node := topology.Nodes[name]

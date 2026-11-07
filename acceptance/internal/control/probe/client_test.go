@@ -18,20 +18,12 @@ import (
 func TestProbeObservesRuntimeExitBeforeReadiness(t *testing.T) {
 	for _, code := range []int{0, 23} {
 		t.Run(fmt.Sprint(code), func(t *testing.T) {
-			binary := filepath.Join(t.TempDir(), "owned-runtime")
-			if err := os.WriteFile(binary, []byte(fmt.Sprintf("#!/bin/sh\nexit %d\n", code)), 0700); err != nil {
-				t.Fatal(err)
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
+			local := exitingRuntime(t, code)
 			started := time.Now()
-			local, err := localClient(ctx, binary, t.TempDir(), probeRuntimeConfig("xray"))
+			err := waitClient(local)
 			t.Logf("exit=%d observed in %s: %v", code, time.Since(started), err)
-			if local != nil {
-				local.stop()
-			}
-			if err == nil || errors.Is(err, context.DeadlineExceeded) || local != nil {
-				t.Fatalf("runtime exit was not observed: client=%v err=%v", local, err)
+			if err == nil || errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("runtime exit was not observed: %v", err)
 			}
 			var exit *exec.ExitError
 			if code != 0 && (!errors.As(err, &exit) || exit.ExitCode() != code) {
@@ -39,6 +31,31 @@ func TestProbeObservesRuntimeExitBeforeReadiness(t *testing.T) {
 			}
 		})
 	}
+}
+
+func exitingRuntime(t *testing.T, code int) *probeClient {
+	t.Helper()
+	directory := t.TempDir()
+	binary := filepath.Join(directory, "owned-runtime")
+	if err := os.WriteFile(binary, []byte(fmt.Sprintf("#!/bin/sh\nexit %d\n", code)), 0700); err != nil {
+		t.Fatal(err)
+	}
+	port, err := freePort()
+	if err != nil {
+		t.Fatal(err)
+	}
+	log, err := os.Create(filepath.Join(directory, "runtime.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Readiness has its own bounded deadline. Filesystem setup/fsync under load
+	// must not consume an unrelated outer budget before the child even starts.
+	local, err := launchClient(t.Context(), binary, "xray", "unused.json", port, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(local.stop)
+	return local
 }
 
 func TestPinnedRuntimeIPQuery(t *testing.T) {

@@ -123,7 +123,7 @@ func TestDeploymentDependenciesDeduplicateServiceRoutes(t *testing.T) {
 
 func TestDeploymentRejectsInvalidProfileIdentity(t *testing.T) {
 	for _, mutate := range []func(*model.Profiles){
-		func(profiles *model.Profiles) { profiles.SchemaVersion = 2 },
+		func(profiles *model.Profiles) { profiles.SchemaVersion = 3 },
 		func(profiles *model.Profiles) { profiles.TopologyID = "wrong" },
 		func(profiles *model.Profiles) { profiles.Routes = nil },
 		func(profiles *model.Profiles) { profiles.Routes["bad/name"] = profiles.Routes["main"] },

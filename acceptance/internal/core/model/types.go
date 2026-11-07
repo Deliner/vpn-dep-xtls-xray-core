@@ -3,6 +3,7 @@ package model
 const Reality = "vless-reality"
 const Shadowsocks = "shadowsocks-2022"
 const SSMethod = "2022-blake3-aes-256-gcm"
+const ClientProfilesVersion = 2
 
 type Definition struct {
 	Version int               `json:"version" yaml:"version"`
@@ -130,19 +131,26 @@ type Deployment struct {
 }
 
 type Profile struct {
-	Engine         string   `json:"engine,omitempty"`
-	RuntimeVersion string   `json:"runtime_version,omitempty"`
-	ImportNote     string   `json:"import_note,omitempty"`
-	URI            string   `json:"uri"`
-	Path           []string `json:"path"`
-	HopCount       int      `json:"hop_count"`
-	EntryNode      string   `json:"entry_node"`
-	ExitNode       string   `json:"exit_node"`
-	ExpectedExitIP string   `json:"expected_exit_ip,omitempty"`
-	ConfigSHA256   string   `json:"client_config_sha256"`
-	SOCKSPort      int      `json:"client_socks_port"`
-	UDP443         string   `json:"udp443"`
-	DNSPolicy      string   `json:"client_dns_policy"`
+	EntryEndpoint  ClientEndpoint `json:"entry_endpoint,omitempty"`
+	Engine         string         `json:"engine,omitempty"`
+	RuntimeVersion string         `json:"runtime_version,omitempty"`
+	ImportNote     string         `json:"import_note,omitempty"`
+	URI            string         `json:"uri"`
+	Path           []string       `json:"path"`
+	HopCount       int            `json:"hop_count"`
+	EntryNode      string         `json:"entry_node"`
+	ExitNode       string         `json:"exit_node"`
+	ExpectedExitIP string         `json:"expected_exit_ip,omitempty"`
+	ConfigSHA256   string         `json:"client_config_sha256"`
+	SOCKSPort      int            `json:"client_socks_port"`
+	UDP443         string         `json:"udp443"`
+	DNSPolicy      string         `json:"client_dns_policy"`
+}
+
+type ClientEndpoint struct {
+	Address string `json:"address"`
+	Port    int    `json:"port"`
+	Network string `json:"network"`
 }
 
 type Profiles struct {
