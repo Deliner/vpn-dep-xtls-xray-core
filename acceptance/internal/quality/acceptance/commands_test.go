@@ -1,0 +1,29 @@
+package acceptance
+
+const fakeGit = `#!/usr/bin/env bash
+set -eu
+if [[ " $* " == *" push --porcelain "* ]]; then
+  printf 'push\n' >> "$CI_TEST_TRACE"
+  exit 43
+fi
+exec "$CI_TEST_GIT" "$@"
+`
+
+const fakeGitHub = `#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$*" >> "$CI_TEST_TRACE"
+case "$*" in
+  'api --hostname github.com user --jq '*)
+    printf 'Deliner\t26311467\n' ;;
+  'api --hostname github.com repos/Deliner/vpn-dep-xtls-xray-core --jq '*)
+    printf '1449369505\t26311467\tDeliner/vpn-dep-xtls-xray-core\tfalse\ttrue\n' ;;
+  'api --hostname github.com repos/Deliner/vpn-dep-xtls-xray-core/actions/permissions --jq '*)
+    printf '%s\t%s\n' "${CI_TEST_ENABLED:-false}" "${CI_TEST_POLICY:-all}" ;;
+  'api --hostname github.com --paginate '*'/actions/workflows?per_page=100 --jq '*)
+    printf '101\tactive\n102\tdisabled_manually\n' ;;
+  'api --hostname github.com --method PUT '*'/workflows/'*'/disable')
+    [[ "${CI_TEST_DISABLE_FAILURE:-0}" == 0 ]] || exit 17 ;;
+  'api --hostname github.com --method PUT '*'/actions/permissions -F enabled=true') ;;
+  *) printf 'Unexpected test API request\n' >&2; exit 2 ;;
+esac
+`

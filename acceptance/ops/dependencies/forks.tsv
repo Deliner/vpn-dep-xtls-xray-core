@@ -1,0 +1,16 @@
+# upstream\tfork\tupstream_repository_id\tfork_repository_id\tupstream_base_commit\tmaintenance_commit
+XTLS/Xray-core	Deliner/vpn-dep-xtls-xray-core	311315731	1449369505	a4a3dff5b20c2faae567b742c172c7b95e75c083	63bd9c0dce4674ca45522aa14a172be240193124
+SagerNet/sing-box	Deliner/vpn-dep-sagernet-sing-box	509091576	1449371112	c005f35300ce76427dc285481ec5695f5b179cd2	f7e15a404d9d5809b209488a223d830f9307eda8
+SagerNet/cronet-go	Deliner/vpn-dep-sagernet-cronet-go	1114929502	1449371738	095cb9e060468c80ca31d977c020dca82d101a8f	c9096670c169e21ef842867f3e9db673f788e9fe
+SagerNet/naiveproxy	Deliner/vpn-dep-sagernet-naiveproxy	1111592083	1449371807	7c64cae24cd7bae18d9c603fdddc73b623c04462	-
+andybalholm/brotli	Deliner/vpn-dep-andybalholm-brotli	175910132	1449379621	33c2a9884269798192b5ecf171288f98939dbe42	-
+klauspost/compress	Deliner/vpn-dep-klauspost-compress	39468142	1449379695	7f5d8528720c895a6106f201719f87eb030a565d	-
+go-chi/chi	Deliner/vpn-dep-go-chi-chi	44344606	1449379758	3b171578ca44dfd75ca3c5cbddc7b44c600a7b49	-
+go-jose/go-jose	Deliner/vpn-dep-go-jose-go-jose	285864234	1449379805	0e59876635f3dbf46d7b5e97b52bb75a3f96e7d9	-
+insomniacslk/dhcp	Deliner/vpn-dep-insomniacslk-dhcp	112529472	1449379876	c76316d4aa825673b208730779843d0711021e81	-
+grpc/grpc-go	Deliner/vpn-dep-grpc-grpc-go	27729907	1449379933	e84aa5ab15d1d2b29d54f838312ad490cb7551a8	-
+golang/net	Deliner/vpn-dep-golang-net	27522271	1449380533	3de643db506517b3e652a13cc0b56034cea6b8e6	-
+golang/crypto	Deliner/vpn-dep-golang-crypto	27522241	1449380609	2f1f834330b2d36ab3db8bfb33aaa1ac16794588	-
+golang/text	Deliner/vpn-dep-golang-text	27522295	1449380661	ac40b0f06c159afb5bfca4d1860f8b4b60dbc160	-
+golang/mod	Deliner/vpn-dep-golang-mod	186022916	1449380724	d0a27b2d4a48460806692bf5c87fc157c3c65292	-
+apernet/quic-go	Deliner/vpn-dep-apernet-quic-go	333248791	1449389496	184d081eef3e9edd5cb7c0ddf2460c91f2e6adb1	-

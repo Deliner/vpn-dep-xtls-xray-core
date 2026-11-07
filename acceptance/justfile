@@ -1,0 +1,25 @@
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+set positional-arguments
+
+export PATH := justfile_directory() / "build/tools/bin" + ":" + justfile_directory() / "build/toolchains/go/bin" + ":" + env("PATH")
+export GOFLAGS := "-mod=readonly"
+export CGO_ENABLED := "0"
+export GOTOOLCHAIN := "local"
+export GOPATH := justfile_directory() / "build/cache/go"
+export GOMODCACHE := justfile_directory() / "build/cache/go-mod"
+export GOCACHE := justfile_directory() / "build/cache/go-build"
+
+import 'ops/tasks/environment.just'
+import 'ops/tasks/development.just'
+import 'ops/tasks/testing.just'
+import 'ops/tasks/lab.just'
+import 'ops/tasks/nhop.just'
+import 'ops/tasks/release.just'
+import 'ops/tasks/runtime.just'
+import 'ops/tasks/legacy.just'
+import 'ops/tasks/dependencies.just'
+import 'ops/tasks/acceptance.just'
+
+# Show all project commands, grouped by responsibility.
+default:
+    @just --list

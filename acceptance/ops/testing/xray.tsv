@@ -1,0 +1,5 @@
+# platform	url	sha256
+linux/amd64	https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip	e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214
+linux/arm64	https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-arm64-v8a.zip	1811c8f1da0c3b6dc707ebaf1c8390e987ba39859a8f0a7aadd8526157f2ec8d
+darwin/amd64	https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-macos-64.zip	37c60b63c77ef5edcfb46a0d70349f7d96e0c132e6a356ead4fd20aeeacc5c75
+darwin/arm64	https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-macos-arm64-v8a.zip	0a05dca3bd311b0bc5a89c7ce56350cab1e829e131e4b2bcd48eb304fac07e9a

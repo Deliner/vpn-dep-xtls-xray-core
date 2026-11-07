@@ -1,0 +1,64 @@
+# Documentation addresses only. Replace addresses, SSH users and REALITY donors.
+version: 1
+name: personal-vpn
+nodes:
+  entry:
+    address: 203.0.113.10
+    ssh:
+      user: secureadmin
+      port: 22222
+      closed_ports: [22] # Verification only; does not reconfigure sshd/firewall.
+      identity_file: ~/.ssh-custom/vps_ed25519
+      known_hosts_file: ~/.ssh-custom/known_hosts
+    firewall: preserve
+    services:
+      reality:
+        protocol: vless-reality
+        port: 443
+        server_name: donor-entry.example.invalid
+      shadowsocks:
+        protocol: shadowsocks-2022
+        port: 8443
+  relay:
+    address: 203.0.113.20
+    ssh:
+      user: secureadmin
+      port: 22222
+      identity_file: ~/.ssh-custom/vps_ed25519
+      known_hosts_file: ~/.ssh-custom/known_hosts
+    firewall: preserve
+    services:
+      reality:
+        protocol: vless-reality
+        port: 443
+        server_name: donor-relay.example.invalid
+      shadowsocks:
+        protocol: shadowsocks-2022
+        port: 8443
+  exit:
+    address: 203.0.113.30
+    ssh:
+      user: secureadmin
+      port: 22222
+      identity_file: ~/.ssh-custom/vps_ed25519
+      known_hosts_file: ~/.ssh-custom/known_hosts
+    firewall: preserve
+    services:
+      reality:
+        protocol: vless-reality
+        port: 443
+        server_name: donor-exit.example.invalid
+      shadowsocks:
+        protocol: shadowsocks-2022
+        port: 8443
+routes:
+  main:
+    path: [entry.reality, relay.shadowsocks, exit.reality]
+    expected_exit_ip: 203.0.113.30
+    client:
+      socks_port: 10808
+  alternative:
+    path: [entry.shadowsocks, relay.reality, exit.shadowsocks]
+    expected_exit_ip: 203.0.113.30
+    client:
+      socks_port: 10809

@@ -1,0 +1,4 @@
+# name	source_url	selected_commit
+vpn-dep-bitbucket-creachadair-shell	https://bitbucket.org/creachadair/shell	e395e2d7c36a2a3a0e9d23cb294f07845b8d87f0
+vpn-dep-codeberg-pfad-check	https://codeberg.org/pfad.fr/check.git	9fb2d34dce1da68a711dd692374931842bf6865d
+vpn-dep-wireguard-wintun-go	https://git.zx2c4.com/wintun-go	0fa3db229ce2036ae779de8ba03d336b7aa826bd

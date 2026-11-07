@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Identity and immutable inputs shared by local CI preparation/publication/collection.
+acceptance_identity() {
+  acceptance_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+  acceptance_repo=Deliner/vpn-dep-xtls-xray-core
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+  [[ "$(gh api --hostname github.com user --jq '[.login,.id]|@tsv')" == $'Deliner\t26311467' ]] || return 2
+  [[ "$(gh api --hostname github.com "repos/$acceptance_repo" --jq '[.id,.owner.id,.full_name,.private,.fork]|@tsv')" == $'1449369505\t26311467\tDeliner/vpn-dep-xtls-xray-core\tfalse\ttrue' ]] || return 2
+}
+
+acceptance_directory() {
+  acceptance_output="$(cd "$1" && pwd -P)"
+  case "$acceptance_output/" in "$acceptance_root/build/acceptance/"*) ;; *) return 2 ;; esac
+  [[ "$(cat "$acceptance_output/repository-name")" == "$acceptance_repo" ]] || return 2
+  acceptance_checkout="$acceptance_output/repository"
+  acceptance_commit="$(cat "$acceptance_output/prepared.commit")"
+  [[ "$acceptance_commit" =~ ^[0-9a-f]{40}$ ]] || return 2
+  [[ "$(git -C "$acceptance_checkout" rev-parse HEAD)" == "$acceptance_commit" ]] || return 2
+  [[ -z "$(git -C "$acceptance_checkout" status --porcelain --untracked-files=all)" ]] || return 2
+  [[ "$(git -C "$acceptance_checkout" remote get-url origin)" == "https://github.com/$acceptance_repo.git" ]] || return 2
+}
+
+acceptance_restore_actions() {
+  # Restore the captured repository policy before re-enabling formerly active workflows.
+  gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/permissions" \
+    --input "$acceptance_output/actions-before.json"
+  while IFS=$'\t' read -r workflow_id workflow_state; do
+    [[ "$workflow_id" =~ ^[0-9]+$ ]] || return 2
+    if [[ "$workflow_state" == active ]]; then
+      gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/workflows/$workflow_id/enable"
+    fi
+  done < "$acceptance_output/workflows-before.tsv"
+  printf 'restored\n' > "$acceptance_output/actions-state"
+}

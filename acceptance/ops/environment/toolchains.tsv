@@ -1,0 +1,9 @@
+# tool	platform	url	sha256
+go	darwin/amd64	https://go.dev/dl/go1.27.3.darwin-amd64.tar.gz	b6f8e931e4ab497fcde6da8ae4499a58f9d258e55c8a80824a516eae5950a750
+go	darwin/arm64	https://go.dev/dl/go1.27.3.darwin-arm64.tar.gz	dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2
+go	linux/amd64	https://go.dev/dl/go1.27.3.linux-amd64.tar.gz	65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40
+go	linux/arm64	https://go.dev/dl/go1.27.3.linux-arm64.tar.gz	a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49
+just	darwin/arm64	https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-aarch64-apple-darwin.tar.gz	50ae3e996c974a0bf32ea7d10f495070df33f1b43e0616b2769e3d4821ed8f48
+just	linux/arm64	https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-aarch64-unknown-linux-musl.tar.gz	748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df
+just	darwin/amd64	https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-apple-darwin.tar.gz	9a09cfef66aaa79da58203970103a0684307716caaabd3e9844cacc4dc0f4023
+just	linux/amd64	https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz	4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d
