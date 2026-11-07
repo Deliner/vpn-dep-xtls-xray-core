@@ -28,7 +28,7 @@ masque-probe-build candidate output:
 cronet-review-input component:
     @bash ops/quality/check.sh static-analysis bash ops/runtime/cronet/review-input.sh "$1"
 
-# Build a native Cronet candidate from exact owned sources and reviewed toolchain inputs on macOS ARM64.
+# Build a native Cronet candidate from exact owned sources and reviewed inputs on Linux AMD64 or macOS ARM64.
 [group('runtime')]
 cronet-build target output:
     @bash ops/quality/check.sh static-analysis bash ops/runtime/cronet/build.sh "$1" "$2"

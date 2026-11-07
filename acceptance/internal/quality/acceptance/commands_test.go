@@ -20,10 +20,12 @@ case "$*" in
   'api --hostname github.com repos/Deliner/vpn-dep-xtls-xray-core/actions/permissions --jq '*)
     printf '%s\t%s\n' "${CI_TEST_ENABLED:-false}" "${CI_TEST_POLICY:-all}" ;;
   'api --hostname github.com --paginate '*'/actions/workflows?per_page=100 --jq '*)
-    printf '101\tactive\n102\tdisabled_manually\n' ;;
+    printf '101\tactive\t.github/workflows/upstream.yml\n102\tdisabled_manually\t.github/workflows/other.yml\n'
+    if [[ "${CI_TEST_REGISTERED:-0}" == 1 ]]; then printf '303\tactive\t.github/workflows/nhop-acceptance.yml\n'; fi ;;
   'api --hostname github.com --method PUT '*'/workflows/'*'/disable')
     [[ "${CI_TEST_DISABLE_FAILURE:-0}" == 0 ]] || exit 17 ;;
   'api --hostname github.com --method PUT '*'/actions/permissions -F enabled=true') ;;
+  'api --hostname github.com --method PUT '*'/workflows/303/enable') ;;
   *) printf 'Unexpected test API request\n' >&2; exit 2 ;;
 esac
 `

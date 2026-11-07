@@ -1,4 +1,4 @@
-name: N-hop native acceptance
+name: N-hop Cronet build
 
 on:
   push:
@@ -8,18 +8,14 @@ permissions:
   contents: read
 
 jobs:
-  protocols:
-    name: Native Linux ${{ matrix.arch }}
+  cronet:
+    name: Cronet Linux ${{ matrix.arch }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+        arch: [amd64, arm64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,14 +23,14 @@ jobs:
       - name: Bootstrap pinned tools
         working-directory: acceptance
         run: bash ops/environment/bootstrap.sh
-      - name: Build, audit and execute the complete native matrix
+      - name: Build pinned native library and retain linkage evidence
         working-directory: acceptance
-        run: build/tools/bin/just acceptance-run '${{ matrix.arch }}'
-      - name: Retain complete results even when acceptance fails
+        run: build/tools/bin/just acceptance-cronet-run '${{ matrix.arch }}'
+      - name: Retain build output even on failure
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: acceptance-linux-${{ matrix.arch }}
+          name: cronet-linux-${{ matrix.arch }}
           path: acceptance/build/acceptance-results
           if-no-files-found: error
           retention-days: 30

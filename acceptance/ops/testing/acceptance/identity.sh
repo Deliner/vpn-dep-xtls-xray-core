@@ -24,10 +24,12 @@ acceptance_restore_actions() {
   # Restore the captured repository policy before re-enabling formerly active workflows.
   gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/permissions" \
     --input "$acceptance_output/actions-before.json"
-  while IFS=$'\t' read -r workflow_id workflow_state; do
+  while IFS=$'\t' read -r workflow_id workflow_state workflow_path; do
     [[ "$workflow_id" =~ ^[0-9]+$ ]] || return 2
     if [[ "$workflow_state" == active ]]; then
       gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/workflows/$workflow_id/enable"
+    else
+      gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/workflows/$workflow_id/disable"
     fi
   done < "$acceptance_output/workflows-before.tsv"
   printf 'restored\n' > "$acceptance_output/actions-state"

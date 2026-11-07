@@ -4,7 +4,7 @@ umask 077
 
 component="${1:-}"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
-case "$component" in clang-mac-arm64|gn-mac-arm64|sysroot-linux-arm64|sysroot-linux-amd64|ninja-mac|pgo-linux|pgo-mac-arm64) ;; *) exit 2 ;; esac
+case "$component" in clang-mac-arm64|clang-linux-amd64|gn-mac-arm64|gn-linux-amd64|sysroot-linux-arm64|sysroot-linux-amd64|ninja-mac|ninja-linux|pgo-linux|pgo-mac-arm64) ;; *) exit 2 ;; esac
 row="$(awk -F '\t' -v component="$component" '$1 == component {print}' "$root/ops/runtime/cronet/inputs.tsv")"
 [[ -n "$row" && "$row" != *$'\n'* ]] || { printf 'Expected one reviewed source URL\n' >&2; exit 2; }
 IFS=$'\t' read -r label expected url <<< "$row"
@@ -17,7 +17,9 @@ done
 stage="$(mktemp -d "$parent/review-XXXXXXXX")"
 printf '%s\n' "$url" > "$stage/url.txt"
 # This command only obtains review evidence. It never extracts or executes input.
-encoding=()
+# Bash 3 on macOS treats an empty array as unset under nounset. Both branches
+# explicitly request the stored/decoded representation that this review verifies.
+encoding=(--header 'Accept-Encoding: identity')
 if [[ "$component" == pgo-* ]]; then encoding=(--header 'Accept-Encoding: gzip'); fi
 curl --fail --location --retry 2 --connect-timeout 20 --max-time 1200 \
   --proto '=https' --proto-redir '=https' --dump-header "$stage/headers.txt" \

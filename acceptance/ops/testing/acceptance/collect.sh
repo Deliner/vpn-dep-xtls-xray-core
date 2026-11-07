@@ -13,6 +13,21 @@ gh run download "$run_id" --repo "$acceptance_repo" --dir "$collection"
 gh run view "$run_id" --repo "$acceptance_repo" --log > "$collection/workflow.log"
 acceptance_restore_actions
 [[ "$(gh run view "$run_id" --repo "$acceptance_repo" --json conclusion --jq .conclusion)" == success ]] || { printf 'Workflow failed; preserved results: %s\n' "$collection" >&2; exit 1; }
+suite=protocols
+if [[ -f "$acceptance_output/suite" ]]; then suite="$(cat "$acceptance_output/suite")"; fi
+if [[ "$suite" == cronet ]]; then
+  for arch in amd64 arm64; do
+    report="$collection/cronet-linux-$arch"
+    [[ "$(cat "$report/status")" == native-built && -s "$report/bin/libcronet.so" && -s "$report/inspection/elf.txt" ]] || exit 1
+    (cd "$report"; shasum -a 256 --check evidence.sha256) > "$report/integrity-verification.log"
+    (cd "$report"; shasum -a 256 --check SHA256SUMS) >> "$report/integrity-verification.log"
+    cmp "$report/source.tsv" <(sed '/^#/d' "$acceptance_checkout/acceptance/ops/runtime/cronet/source.tsv")
+  done
+  printf 'build-evidence-verified\n' > "$acceptance_output/status"
+  printf 'Native build evidence verified; ABI/payload/CVE acceptance remains open: %s\n' "$collection"
+  exit 0
+fi
+[[ "$suite" == protocols ]] || exit 2
 for arch in amd64 arm64; do
   report="$collection/acceptance-linux-$arch"
   [[ "$(cat "$report/status")" == passed ]] || exit 1

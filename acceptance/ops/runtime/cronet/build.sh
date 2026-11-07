@@ -8,8 +8,14 @@ source "$recipe/prepare.sh"
 source "$recipe/toolchain.sh"
 target="${1:-}"
 output="${2:-}"
-[[ "$(uname -s)/$(uname -m)" == Darwin/arm64 && "$(go env GOVERSION)" == go1.27.3 ]] || exit 2
+[[ "$(go env GOVERSION)" == go1.27.3 ]] || exit 2
+case "$(uname -s)/$(uname -m)" in
+  Darwin/arm64) native_host=mac-arm64; native_ninja=ninja-mac ;;
+  Linux/x86_64) native_host=linux-amd64; native_ninja=ninja-linux ;;
+  *) printf 'Native build requires macOS ARM64 or Linux AMD64 host.\n' >&2; exit 2 ;;
+esac
 case "$target" in linux/arm64) native_os=linux; native_cpu=arm64 ;; linux/amd64) native_os=linux; native_cpu=x64 ;; darwin/arm64) native_os=mac; native_cpu=arm64 ;; *) exit 2 ;; esac
+[[ "$native_os" != mac || "$native_host" == mac-arm64 ]] || { printf 'Darwin target requires macOS SDK.\n' >&2; exit 2; }
 [[ "$output" =~ ^build/native-candidates/[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { printf 'Expected a new build/native-candidates/name\n' >&2; exit 2; }
 for directory in "$root/build" "$root/build/native-candidates"; do
   [[ ! -L "$directory" ]] || exit 2
@@ -34,7 +40,7 @@ export GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GOPRIVATE= GONOPR
   "$src/gn/out/gn" --version
   "$work/tools/ninja-real" --version
   python3 --version
-  xcrun --sdk macosx --show-sdk-version
+  if [[ "$native_host" == mac-arm64 ]]; then xcrun --sdk macosx --show-sdk-version; else uname -a; fi
   (cd "$root" && shasum -a 256 ops/runtime/cronet/*)
   (cd "$work" && shasum -a 256 inputs/* source.tsv inputs.tsv tools/*)
 } > "$work/provenance.txt"
@@ -43,6 +49,11 @@ go -C "$work/source" run ./cmd/build-naive build --target "$target" > "$work/bui
 native_output="$src/out/cronet-$native_os-$native_cpu"
 cp "$native_output/obj/components/cronet/libcronet_static.a" "$work/bin/libcronet.a"
 if [[ "$native_os" == linux ]]; then cp "$native_output/libcronet.so" "$work/bin/libcronet.so"; fi
+mkdir "$work/inspection"
+cp "$native_output/args.gn" "$work/inspection/args.gn"
+cp "$src/components/cronet/native/include/cronet_c.h" "$work/inspection/cronet_c.h"
+(cd "$src" && "$src/gn/out/gn" desc "$native_output" //components/cronet:cronet deps --all) > "$work/inspection/dependencies.txt"
+(cd "$src" && "$work/tools/ninja-real" -C "$native_output" -t commands cronet) > "$work/inspection/commands.txt"
 (cd "$work" && shasum -a 256 bin/* provenance.txt build.log > SHA256SUMS)
 printf 'native-built\n' > "$work/status"
 printf 'Native candidate built; ABI and payload acceptance still required: %s\n' "$work"

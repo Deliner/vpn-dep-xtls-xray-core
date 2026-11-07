@@ -1,7 +1,7 @@
 # Prepare a reviewable CI branch in the existing maintained Xray fork from clean committed sources.
 [group('acceptance')]
-acceptance-prepare output:
-    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/prepare.sh "$1"
+acceptance-prepare output suite='protocols':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/prepare.sh "$1" "$2"
 
 # MUTATES GITHUB: enable only the prepared acceptance run after disabling inherited workflows, then push without force.
 [group('acceptance')]
@@ -13,7 +13,12 @@ acceptance-publish directory:
 acceptance-run arch:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/run.sh "$1"
 
-# Download a completed matching CI run and verify its native payload reports before restoring disabled Actions.
+# Build a pinned Cronet Linux target on a native AMD64 runner, retaining source/toolchain/linkage evidence.
+[group('acceptance')]
+acceptance-cronet-run arch:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet.sh "$1"
+
+# Download a completed matching CI run, restore captured Actions policy and independently verify its evidence.
 [group('acceptance')]
 acceptance-collect directory run_id:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/collect.sh "$1" "$2"

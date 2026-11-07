@@ -1,0 +1,36 @@
+name: N-hop Cronet build
+
+on:
+  push:
+    branches: [nhop-acceptance]
+
+permissions:
+  contents: read
+
+jobs:
+  cronet:
+    name: Cronet Linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Bootstrap pinned tools
+        working-directory: acceptance
+        run: bash ops/environment/bootstrap.sh
+      - name: Build pinned native library and retain linkage evidence
+        working-directory: acceptance
+        run: build/tools/bin/just acceptance-cronet-run '${{ matrix.arch }}'
+      - name: Retain build output even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: cronet-linux-${{ matrix.arch }}
+          path: acceptance/build/acceptance-results
+          if-no-files-found: error
+          retention-days: 30

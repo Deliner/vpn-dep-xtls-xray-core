@@ -2,9 +2,9 @@
 # Configure only already reviewed toolchain inputs; no downloader is executed here.
 native_prepare_tools() {
   local clang gn ninja clang_directory
-  clang="$(native_pin_input clang-mac-arm64)"
-  gn="$(native_pin_input gn-mac-arm64)"
-  ninja="$(native_pin_input ninja-mac)"
+  clang="$(native_pin_input "clang-$native_host")"
+  gn="$(native_pin_input "gn-$native_host")"
+  ninja="$(native_pin_input "$native_ninja")"
   clang_directory="$src/third_party/llvm-build/Release+Asserts"
   mkdir -p "$clang_directory" "$src/gn/out" "$work/tools"
   tar -xf "$clang" -C "$clang_directory"
@@ -19,7 +19,7 @@ native_prepare_tools() {
 }
 
 native_prepare_target() {
-  local profile component profile_file sysroot destination
+  local profile component profile_file
   component=pgo-linux
   profile_file="$src/chrome/build/linux.pgo.txt"
   if [[ "$target" == darwin/arm64 ]]; then
@@ -33,10 +33,20 @@ native_prepare_target() {
   mkdir -p "$src/chrome/build/pgo_profiles"
   cp "$profile" "$src/chrome/build/pgo_profiles/$profile_name"
   if [[ "$target" == linux/* ]]; then
-    sysroot="$(native_pin_input "sysroot-linux-${target#*/}")"
-    destination="$src/out/sysroot-build/bullseye/bullseye_${target#*/}_staging"
-    mkdir -p "$destination"
-    tar -xf "$sysroot" -C "$destination"
-    [[ -d "$destination/lib" ]] || return 2
+    # The upstream driver builds host tools before an ARM64 cross target.
+    # Both sysroots must exist before get-clang.sh can run without downloads.
+    if [[ "$native_host" == linux-amd64 && "$target" != linux/amd64 ]]; then
+      native_prepare_sysroot amd64
+    fi
+    native_prepare_sysroot "${target#*/}"
   fi
+}
+
+native_prepare_sysroot() {
+  local arch="$1" sysroot destination
+  sysroot="$(native_pin_input "sysroot-linux-$arch")"
+  destination="$src/out/sysroot-build/bullseye/bullseye_${arch}_staging"
+  mkdir -p "$destination"
+  tar -xf "$sysroot" -C "$destination"
+  [[ -d "$destination/lib" ]] || return 2
 }
