@@ -35,7 +35,12 @@ func getControlFunc(ctx context.Context, sockopt *SocketConfig, controllers []fu
 				}
 			}
 
-			setReusePort(fd)
+			// A kernel-selected port must be exclusive: SO_REUSEPORT can assign
+			// port zero to an existing UDP listener and misdeliver its packets.
+			_, port, err := net.SplitHostPort(address)
+			if err != nil || port != "0" {
+				setReusePort(fd)
+			}
 		})
 	}
 }
