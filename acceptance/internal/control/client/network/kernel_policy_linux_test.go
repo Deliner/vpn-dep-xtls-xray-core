@@ -27,7 +27,7 @@ func TestKernelKillSwitchDeniesDirectAndEstablishedEgress(t *testing.T) {
 		ordinary.check(t, request, true)
 	}
 	ordinary.check(t, kernelRequest{"tcp", "198.51.100.7:24443", "hold"}, true)
-	applyKernelPolicy(t)
+	applyKernelPolicy(t, Defaults(20000))
 	counts := make([]int64, len(origins))
 	for i, counter := range origins {
 		counts[i] = counter.Load()
@@ -56,9 +56,9 @@ func kernelRequests() []kernelRequest {
 		{"tcp", "[2001:db8:ffff::1]:24444", ""}, {"udp", "[2001:db8:ffff::1]:53", ""}}
 }
 
-func applyKernelPolicy(t *testing.T) {
+func applyKernelPolicy(t *testing.T, options Options) {
 	t.Helper()
-	policy, err := Firewall(fixture(t), Defaults(20000))
+	policy, err := Firewall(fixture(t), options)
 	if err != nil {
 		t.Fatal(err)
 	}

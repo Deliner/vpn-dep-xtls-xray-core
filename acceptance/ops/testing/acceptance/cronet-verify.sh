@@ -20,5 +20,6 @@ printf 'running\n' > "$report/status"
 } > "$report/identity.txt"
 NHOP_CRONET_LIBRARY="$candidate/bin/libcronet.so" "$candidate/bin/range.test" \
   -test.run '^TestRangeResponseBoundaries$' -test.v -test.timeout 60s > "$report/range.log" 2>&1
+just acceptance-cronet-payload "$1" "$candidate" "$report/naive" > "$report/naive-driver.log" 2>&1
 printf 'passed\n' > "$report/status"
 cat "$report/range.log"

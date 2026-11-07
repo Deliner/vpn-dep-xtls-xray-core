@@ -35,7 +35,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
   native-range:
-    name: Native Cronet regression ${{ matrix.arch }}
+    name: Native Cronet and Naive acceptance ${{ matrix.arch }}
     needs: cronet
     strategy:
       fail-fast: false
@@ -46,7 +46,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,7 +58,7 @@ jobs:
         with:
           name: cronet-linux-${{ matrix.arch }}
           path: acceptance/build/cronet-artifact
-      - name: Verify artifact and run range regression on actual target CPU
+      - name: Verify range regression and Naive H2/H3 on actual target CPU
         working-directory: acceptance
         run: build/tools/bin/just acceptance-cronet-verify '${{ matrix.arch }}' build/cronet-artifact
       - name: Preserve native verification evidence

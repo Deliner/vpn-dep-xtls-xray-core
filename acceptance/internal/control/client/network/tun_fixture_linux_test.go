@@ -12,7 +12,7 @@ import (
 	"vpn-script/internal/runtime/xray"
 )
 
-func liveConfigs(t *testing.T, directory, trust string) profile.Imported {
+func liveConfigs(t *testing.T, directory, trust string, options Options) profile.Imported {
 	t.Helper()
 	value := fixture(t)
 	password := "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY="
@@ -28,7 +28,6 @@ func liveConfigs(t *testing.T, directory, trust string) profile.Imported {
 		t.Fatal(err)
 	}
 	value.Metadata.ConfigSHA256, _ = safeio.Digest(value.Config)
-	options := Defaults(20000)
 	options.DNSIP, options.DNSName = "198.18.0.2", "dns.example.invalid"
 	tun, err := TUN(value, options)
 	if err != nil {

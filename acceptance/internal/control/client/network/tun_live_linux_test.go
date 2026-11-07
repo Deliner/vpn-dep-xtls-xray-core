@@ -17,12 +17,16 @@ func TestKernelTUNTrafficDNSAndEngineFailure(t *testing.T) {
 		t.Fatal("live TUN test refused outside isolated owned Linux guest")
 	}
 	directory := liveDirectory(t)
-	liveConfigs(t, directory, startTunneledDNS(t))
+	options := Defaults(20000)
+	if os.Getenv("NHOP_CLIENT_IPV6") != "" {
+		options.IPv6 = os.Getenv("NHOP_CLIENT_IPV6")
+	}
+	liveConfigs(t, directory, startTunneledDNS(t), options)
 	kernelTCP(t, "198.18.0.2:18080")
 	kernelUDP(t, "198.18.0.2:18081")
 	kernelTCP(t, "[2001:db8:feed::2]:18080")
 	liveProcess(t, directory, "exit", filepath.Join(directory, "xray"), "run", "-config", filepath.Join(directory, "server.json"))
-	applyKernelPolicy(t)
+	applyKernelPolicy(t, options)
 	native := liveProcess(t, directory, "native", "ip", "netns", "exec", "nhop-client-inner", "setpriv", "--reuid=20000", "--regid=20000", "--clear-groups",
 		filepath.Join(directory, "xray"), "run", "-config", filepath.Join(directory, "native.json"))
 	waitLiveCommand(t, "12080", "ss", "-H", "-lnt", "sport", "=", ":12080")
@@ -40,6 +44,6 @@ func checkTUNTraffic(t *testing.T, probe *kernelProbe, allowed bool) {
 	t.Helper()
 	probe.check(t, kernelRequest{"tcp", "198.18.0.2:18080", ""}, allowed)
 	probe.check(t, kernelRequest{"udp", "198.18.0.2:18081", ""}, allowed)
-	probe.check(t, kernelRequest{"tcp", "[2001:db8:feed::2]:18080", ""}, allowed)
+	probe.check(t, kernelRequest{"tcp", "[2001:db8:feed::2]:18080", ""}, allowed && os.Getenv("NHOP_CLIENT_IPV6") != "block")
 	probe.check(t, kernelRequest{"udp", DNS + ":53", "dns"}, allowed)
 }

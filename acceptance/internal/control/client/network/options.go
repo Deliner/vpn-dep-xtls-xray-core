@@ -14,6 +14,7 @@ const IPv4 = "172.30.255.1/30"
 const IPv6 = "fdfe:dcba:9876::1/126"
 const DNS = "172.30.255.2"
 const RouteIndex = 30910
+const AssistTable = RouteIndex + 1
 
 type Options struct {
 	Interface string `json:"interface"`

@@ -23,6 +23,11 @@ acceptance-cronet-run arch:
 acceptance-cronet-verify arch candidate:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet-verify.sh "$1" "$2"
 
+# Bind verified Go candidates to the new native library and test Naive H2/H3 TCP/UDP on native Linux.
+[group('acceptance')]
+acceptance-cronet-payload arch candidate output:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet-payload.sh "$1" "$2" "$3"
+
 # Download a completed matching CI run, restore captured Actions policy and independently verify its evidence.
 [group('acceptance')]
 acceptance-collect directory run_id:

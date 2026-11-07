@@ -31,3 +31,21 @@ func TUN(imported profile.Imported, options Options) (model.Object, error) {
 		"route": model.Object{"auto_detect_interface": true, "final": "proxy", "default_domain_resolver": "tunnel-dns", "rules": []model.Object{
 			{"port": 53, "action": "hijack-dns"}, {"network": "udp", "port": 443, "action": "reject"}}}}, nil
 }
+
+// ManualTUN leaves policy routes to the client session. Its supervisor can then
+// restore those rules even if the frontend is killed without running its cleanup.
+func ManualTUN(imported profile.Imported, options Options) (model.Object, error) {
+	config, err := TUN(imported, options)
+	if err != nil {
+		return nil, err
+	}
+	inbound := config["inbounds"].([]model.Object)[0]
+	inbound["auto_route"], inbound["strict_route"] = false, false
+	for _, field := range []string{"iproute2_table_index", "iproute2_rule_index", "route_exclude_address"} {
+		delete(inbound, field)
+	}
+	// sing-tun retains one IPv6 bound-interface rule even with auto_route=false.
+	// Pin its auxiliary table so the session can identify it after a hard crash.
+	inbound["iproute2_table_index"] = AssistTable
+	return config, nil
+}

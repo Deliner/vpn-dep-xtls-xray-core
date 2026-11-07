@@ -12,7 +12,11 @@ collection="$(mktemp -d "$acceptance_output/collection-XXXXXXXX")"
 gh run download "$run_id" --repo "$acceptance_repo" --dir "$collection"
 gh run view "$run_id" --repo "$acceptance_repo" --log > "$collection/workflow.log"
 acceptance_restore_actions
-[[ "$(gh run view "$run_id" --repo "$acceptance_repo" --json conclusion --jq .conclusion)" == success ]] || { printf 'Workflow failed; preserved results: %s\n' "$collection" >&2; exit 1; }
+if [[ "$(gh run view "$run_id" --repo "$acceptance_repo" --json conclusion --jq .conclusion)" != success ]]; then
+  printf 'workflow-failed\n' > "$acceptance_output/status"
+  printf 'Workflow failed; preserved results: %s\n' "$collection" >&2
+  exit 1
+fi
 suite=protocols
 if [[ -f "$acceptance_output/suite" ]]; then suite="$(cat "$acceptance_output/suite")"; fi
 if [[ "$suite" == cronet ]]; then
@@ -26,6 +30,11 @@ if [[ "$suite" == cronet ]]; then
       verification="$collection/cronet-native-$arch"
       [[ "$(cat "$verification/status")" == passed && -s "$verification/range.log" ]] || exit 1
       (cd "$verification"; shasum -a 256 --check evidence.sha256) > "$verification/integrity-verification.log"
+      if [[ -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet-payload.sh" ]]; then
+        [[ "$(cat "$verification/naive/status")" == passed ]] || exit 1
+        (cd "$verification/naive"; shasum -a 256 --check evidence.sha256; shasum -a 256 --check runtime.sha256) >> "$verification/integrity-verification.log"
+        cmp "$verification/naive/bin/libcronet.so" "$report/bin/libcronet.so"
+      fi
     fi
   done
   printf 'build-evidence-verified\n' > "$acceptance_output/status"

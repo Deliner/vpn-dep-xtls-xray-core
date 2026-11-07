@@ -15,5 +15,15 @@ client-kernel-test:
 
 # Exercise real Linux TUN TCP/UDP/IPv6/DNS and leak denial after engine/front-end failure in the owned VM.
 [group('client')]
-client-tun-test xray singbox:
-    @bash ops/quality/check.sh static-analysis bash ops/testing/client/tun.sh "$1" "$2"
+client-tun-test xray singbox ipv6='tunnel':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/tun.sh "$1" "$2" "$3"
+
+# Verify per-TUN system DNS configuration and restoration with a private resolved/D-Bus in the owned VM.
+[group('client')]
+client-resolver-test:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/resolver.sh
+
+# Exercise production session start/stop and engine-failure cleanup with real TUN/DNS/nftables in the owned VM.
+[group('client')]
+client-session-test xray singbox:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/session.sh "$1" "$2"
