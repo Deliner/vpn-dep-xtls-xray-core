@@ -8,6 +8,7 @@ case "${1:-policy}" in
   tun) pattern='^TestKernelTUNTrafficDNSAndEngineFailure$' ;;
   resolver) pattern='^TestKernelResolvedPrivateLinkLifecycle$' ;;
   session) pattern='^TestKernelSessionStartStopAndFailures$' ;;
+  public) pattern='^TestKernelPublicClientAndControllerRecovery$' ;;
   *) exit 2 ;;
 esac
 case "${2:-tunnel}" in tunnel|block) export NHOP_CLIENT_IPV6="${2:-tunnel}" ;; *) exit 2 ;; esac
@@ -40,11 +41,20 @@ if [[ "${1:-}" == resolver ]]; then
   ip link set nhopdns up
   export NHOP_CLIENT_RESOLVED_TEST=private-netns
 fi
-if [[ "${1:-}" == session ]]; then
+if [[ "${1:-}" == session || "${1:-}" == public ]]; then
   source ./resolved-guest.sh
   client_private_resolved
 fi
+if [[ "${1:-}" == public ]]; then
+  # NSS mutations are confined to a copied /etc inside this mount namespace.
+  # The guest's original passwd/group/shadow and running services are untouched.
+  cp -a /etc /run/nhop-session-test/etc
+  mount --bind /run/nhop-session-test/etc /etc
+  mkdir -p /run/nhop-client
+  mount -t tmpfs -o mode=0711 nhop-client-control-test /run/nhop-client
+  export NHOP_CLIENT_PUBLIC_TEST=private-netns
+fi
 NHOP_CLIENT_KERNEL_TEST=private-netns NHOP_CLIENT_RUNTIME="$PWD/bin" ./network.test \
   -test.run "$pattern" -test.v -test.timeout=1m
-case "${1:-}" in resolver|session) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
-if [[ "${1:-}" == session ]]; then cat bus.log resolved.log; fi
+case "${1:-}" in resolver|session|public) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
+if [[ "${1:-}" == session || "${1:-}" == public ]]; then cat bus.log resolved.log; fi

@@ -31,6 +31,29 @@ type listing struct {
 	} `json:"nftables"`
 }
 
+// Verify requires the same table identity and drop policy, or verified absence
+// when activation never recorded a lease. An inspection error is never absence.
+func (m *Manager) Verify(ctx context.Context, lease Lease) error {
+	if lease != (Lease{}) {
+		actual, err := m.inspect(ctx)
+		if err != nil || actual != lease {
+			return fmt.Errorf("client firewall ownership changed; protection retained")
+		}
+		return m.verifyProtection(ctx)
+	}
+	result, err := m.run(ctx, 5*time.Second, "nft", "--json", "list", "tables")
+	var value listing
+	if err != nil || !result.Success || json.Unmarshal(result.Output, &value) != nil || value.NFTables == nil {
+		return fmt.Errorf("cannot prove client firewall is absent")
+	}
+	for _, item := range value.NFTables {
+		if item.Table != nil && item.Table.Family == "inet" && item.Table.Name == network.Table {
+			return fmt.Errorf("unrecorded client firewall exists; inspect before recovery")
+		}
+	}
+	return nil
+}
+
 func (m *Manager) verifyProtection(ctx context.Context) error {
 	result, err := m.run(ctx, 5*time.Second, "nft", "--json", "list", "table", "inet", network.Table)
 	var value listing

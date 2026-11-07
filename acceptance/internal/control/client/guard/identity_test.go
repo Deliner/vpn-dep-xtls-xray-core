@@ -29,3 +29,17 @@ func TestReleaseNeverDeletesAReplacedOrAmbiguousTable(t *testing.T) {
 		}
 	}
 }
+
+func TestRecoveryWithoutLeaseRequiresProvenAbsence(t *testing.T) {
+	for _, observed := range []string{"", `{}`, `{"nftables":[{"table":{"family":"inet","name":"nhop_client"}}]}`} {
+		manager := &Manager{run: func(_ context.Context, _ time.Duration, args ...string) (process.Result, error) {
+			if strings.Join(args, " ") != "nft --json list tables" {
+				t.Fatal("recovery attempted a mutation", args)
+			}
+			return process.Result{Success: true, Output: []byte(observed)}, nil
+		}}
+		if manager.Verify(t.Context(), Lease{}) == nil {
+			t.Fatal("unknown/unrecorded firewall accepted as absent", observed)
+		}
+	}
+}

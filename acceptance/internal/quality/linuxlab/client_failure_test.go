@@ -50,6 +50,9 @@ func clientFailureFixture(t *testing.T) string {
 	for _, name := range []string{"network", "resolver"} {
 		write(t, filepath.Join(root, "internal/control/client", name, "fixture.go"), []byte("package fixture\n"))
 	}
+	for _, name := range []string{"go.mod", "go.sum", "cmd/nhop-client/main.go"} {
+		write(t, filepath.Join(root, name), []byte("fixture input\n"))
+	}
 	return root
 }
 

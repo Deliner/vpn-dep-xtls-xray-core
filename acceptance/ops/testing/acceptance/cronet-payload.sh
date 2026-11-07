@@ -13,7 +13,7 @@ trap 'result=$?; if ((result != 0)); then printf "failed\n" > "$report/status"; 
 printf 'running\n' > "$report/status"
 mkdir "$report/bin"
 for engine in xray sing-box; do
-  output="build/cronet-payload-candidates/$engine-linux-$arch"
+  output="build/runtime-candidates/cronet-payload-$engine-linux-$arch"
   just candidate-build "$engine" linux "$arch" "$output" > "$report/$engine-build.log" 2>&1
   cp "$output/provenance.txt" "$report/$engine-provenance.txt"
   cp "$output/SHA256SUMS" "$report/$engine-SHA256SUMS"

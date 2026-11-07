@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,12 +32,17 @@ func prepare(request Request) (*os.File, error) {
 	}
 	if err := snapshot(request); err != nil {
 		lock.Close()
-		return nil, err
+		// This newly created directory has never been executed or exposed writable
+		// to an engine. A failed snapshot must not accumulate copied runtimes.
+		return nil, errors.Join(err, os.RemoveAll(request.Directory))
 	}
 	return lock, nil
 }
 
 func snapshot(request Request) error {
+	if err := safeio.NewJSON(filepath.Join(request.Directory, "request.json"), request); err != nil {
+		return err
+	}
 	artifacts := map[string]Artifact{"native": request.Native, "frontend": request.Frontend, "libcronet.so": request.Cronet}
 	for name, artifact := range artifacts {
 		if err := copyArtifact(request.Directory, name, artifact); err != nil {

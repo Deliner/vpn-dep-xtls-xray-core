@@ -5,12 +5,63 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"vpn-script/internal/control/client/guard"
+	"vpn-script/internal/control/client/network"
+	"vpn-script/internal/control/client/resolver"
+	"vpn-script/internal/control/client/routing"
 	"vpn-script/internal/platform/safeio"
 )
+
+// Recover accepts only a trusted root-owned journal after the controller lock
+// has been acquired. It never signals recorded PIDs or adopts a surviving TUN.
+// The caller must explicitly Stop to release the verified persistent guard.
+func Recover(ctx context.Context, request Request, status Status) (*Session, error) {
+	if runtime.GOOS != "linux" || os.Geteuid() != 0 {
+		return nil, fmt.Errorf("client recovery requires Linux root")
+	}
+	if err := network.Validate(request.Profile, request.Network); err != nil {
+		return nil, err
+	}
+	s := &Session{request: request, status: status, group: newChildren()}
+	if err := s.linkGone(); err != nil {
+		return nil, err
+	}
+	s.guard, _ = guard.New()
+	s.dns, _ = resolver.New()
+	if err := s.guard.Verify(ctx, status.Guard); err != nil {
+		return nil, err
+	}
+	var err error
+	s.routes, err = recoveryRoutes(ctx, request, status.Guard)
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(request.Directory, "session.lock")
+	if err := safeio.CheckAccess(path, 0600, 0, 0); err != nil {
+		return nil, err
+	}
+	s.lock, err = safeio.Lock(path)
+	if err != nil {
+		return nil, err
+	}
+	s.protected = status.Guard != (guard.Lease{})
+	return s, nil
+}
+
+func recoveryRoutes(ctx context.Context, request Request, lease guard.Lease) (*routing.Manager, error) {
+	entry, iface, ipv6 := request.Profile.Metadata.EntryEndpoint.Address, request.Network.Interface, request.Network.IPv6 == "tunnel"
+	if lease == (guard.Lease{}) {
+		// Routes cannot have been installed before acquiring the guard. Without a
+		// recorded lease, require vacancy instead of adopting matching selectors.
+		return routing.New(ctx, entry, iface, ipv6)
+	}
+	return routing.Recorded(entry, iface, ipv6)
+}
 
 // Wait observes engine failure or controller cancellation. Neither authorizes
 // opening the direct network: both stop children and retain the kill switch.

@@ -19,7 +19,7 @@ client_lab_begin() {
     go version
     git -C "$lab_root" rev-parse HEAD
     git -C "$lab_root" status --porcelain
-    (cd "$lab_root"; find internal/control/client -name '*.go' -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256; shasum -a 256 ops/testing/client/*.sh)
+    (cd "$lab_root"; find internal -name '*.go' -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256; shasum -a 256 go.mod go.sum cmd/nhop-client/main.go ops/testing/client/*.sh)
   } > "$run/provenance.txt"
 }
 
@@ -37,7 +37,9 @@ cd "runs/$1"
 printf '%s  package.tar.gz\n' "$2" | sha256sum --check
 tar -xzf package.tar.gz
 sha256sum --check SHA256SUMS
+before_accounts="$(sha256sum /etc/passwd /etc/group)"
 sudo -n unshare --mount --net bash guest.sh "$3" "$4"
+[[ "$(sha256sum /etc/passwd /etc/group)" == "$before_accounts" ]]
 GUEST
   then result=0; else result=$?; fi
   # Print only after the command's redirection has been unwound, never in EXIT.

@@ -17,7 +17,7 @@ func TestShutdownReapsRemainingChildAfterExitNoticeWasConsumed(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	group := &children{exits: make(chan childExit, 2)}
+	group := newChildren()
 	t.Cleanup(group.stop)
 	request := Request{Directory: directory}
 	for _, name := range []string{"native", "frontend"} {

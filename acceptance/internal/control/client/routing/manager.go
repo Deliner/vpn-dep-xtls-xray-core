@@ -17,6 +17,16 @@ import (
 // New checks that neither our table nor reserved priorities are already used.
 // No routing mutation occurs until the caller has installed the kill switch.
 func New(ctx context.Context, entry, interfaceName string, ipv6 bool) (*Manager, error) {
+	m, err := Recorded(entry, interfaceName, ipv6)
+	if err != nil {
+		return nil, err
+	}
+	return m, m.vacant(ctx)
+}
+
+// Recorded reconstructs selectors from a trusted private session journal for
+// explicit recovery. Restore still requires absent TUN routes and exact rules.
+func Recorded(entry, interfaceName string, ipv6 bool) (*Manager, error) {
 	address, err := netip.ParseAddr(entry)
 	if err != nil || runtime.GOOS != "linux" || os.Geteuid() != 0 {
 		return nil, fmt.Errorf("route ownership requires Linux root and an explicit entry IP")
@@ -31,7 +41,7 @@ func New(ctx context.Context, entry, interfaceName string, ipv6 bool) (*Manager,
 		}
 		m.rules = append(m.rules, rule{family, "", strconv.Itoa(network.RouteIndex), network.RouteIndex + 1})
 	}
-	return m, m.vacant(ctx)
+	return m, nil
 }
 
 func (r rule) args(operation string) []string {

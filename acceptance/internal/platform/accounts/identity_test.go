@@ -1,11 +1,11 @@
-package serviceuser_test
+package accounts_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
-	"vpn-script/internal/node/serviceuser"
+	"vpn-script/internal/platform/accounts"
 )
 
 func records() map[string]string {
@@ -15,7 +15,7 @@ func records() map[string]string {
 		"getent group vpn-nhop": group, "getent group 986": group, "id -G vpn-nhop": "986\n"}
 }
 
-func command(responses map[string]string, failed string) serviceuser.Command {
+func command(responses map[string]string, failed string) accounts.Command {
 	return func(args ...string) ([]byte, error) {
 		key := strings.Join(args, " ")
 		value, found := responses[key]
@@ -28,8 +28,8 @@ func command(responses map[string]string, failed string) serviceuser.Command {
 
 func rejected(t *testing.T, responses map[string]string, failed string) {
 	t.Helper()
-	identity, err := serviceuser.Inspect(command(responses, failed))
-	if err == nil || !strings.Contains(err.Error(), "unsafe service identity") || identity != (serviceuser.Identity{}) {
+	identity, err := (accounts.Policy{Name: "vpn-nhop"}).Inspect(command(responses, failed))
+	if err == nil || !strings.Contains(err.Error(), "unsafe service identity") || identity != (accounts.Identity{}) {
 		t.Fatalf("unsafe or incomplete NSS identity accepted: %+v, %v", identity, err)
 	}
 }
@@ -39,8 +39,8 @@ func TestInspectAcceptsDedicatedNonLoginAccount(t *testing.T) {
 		responses := records()
 		responses["getent group vpn-nhop"] = "vpn-nhop:x:986:" + members + "\n"
 		responses["getent group 986"] = responses["getent group vpn-nhop"]
-		identity, err := serviceuser.Inspect(command(responses, ""))
-		if err != nil || identity != (serviceuser.Identity{UID: 987, GID: 986}) {
+		identity, err := (accounts.Policy{Name: "vpn-nhop"}).Inspect(command(responses, ""))
+		if err != nil || identity != (accounts.Identity{UID: 987, GID: 986}) {
 			t.Fatal("dedicated account rejected", identity, err)
 		}
 	}

@@ -10,7 +10,7 @@ import (
 	"vpn-script/internal/platform/safeio"
 )
 
-const usage = "nhop-client import --bundle DIR --route NAME --output PROFILE\nnhop-client plan --profile PROFILE --engine-uid UID --output NEW_DIR [--ipv6 tunnel|block]\nThese commands prepare private files; they do not activate networking.\n"
+const usage = "nhop-client import --bundle DIR --route NAME --output PROFILE\nnhop-client plan --profile PROFILE --engine-uid UID --output NEW_DIR [--ipv6 tunnel|block]\nnhop-client start --profile PROFILE --runtimes INVENTORY [--ipv6 tunnel|block]\nnhop-client diagnostics\nnhop-client stop\nstart/stop require Linux root; import/plan never activate networking.\n"
 
 func Run(args []string, output io.Writer) error {
 	if len(args) == 0 || args[0] == "--help" {
@@ -24,9 +24,16 @@ func Run(args []string, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if args[0] == "plan" {
+	switch args[0] {
+	case "plan":
 		return plan(value, output)
+	case "start", "stop", "diagnostics":
+		return control(args[0], value, output)
 	}
+	return importProfile(value, output)
+}
+
+func importProfile(value options, output io.Writer) error {
 	imported, err := profile.Import(value.bundle, value.route)
 	if err != nil {
 		return err

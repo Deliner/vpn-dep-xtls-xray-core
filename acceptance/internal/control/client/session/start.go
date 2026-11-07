@@ -29,7 +29,7 @@ func Start(ctx context.Context, request Request) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Session{request: request, lock: lock, routes: routes, status: Status{Phase: "starting"}, group: &children{exits: make(chan childExit, 2)}}
+	s := &Session{request: request, lock: lock, routes: routes, status: Status{Phase: "starting"}, group: newChildren()}
 	s.guard, _ = guard.New()
 	s.dns, _ = resolver.New()
 	if err := s.activate(ctx); err != nil {
@@ -43,6 +43,9 @@ func Start(ctx context.Context, request Request) (*Session, error) {
 }
 
 func (s *Session) activate(ctx context.Context) error {
+	if err := s.save(); err != nil {
+		return err
+	}
 	var err error
 	s.status.Guard, err = s.guard.Acquire(ctx, s.request.Profile, s.request.Network)
 	if err != nil {

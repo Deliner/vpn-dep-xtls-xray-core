@@ -37,6 +37,7 @@ func (g *children) reap(command *exec.Cmd, name string, log *os.File) {
 	err := command.Wait()
 	log.Close()
 	g.exits <- childExit{name: name, err: err}
+	g.notice.Do(func() { close(g.done) })
 }
 
 func (g *children) stop() {

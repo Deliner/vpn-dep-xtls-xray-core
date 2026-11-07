@@ -13,8 +13,8 @@ import (
 )
 
 type Artifact struct {
-	Path   string
-	SHA256 string
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
 }
 
 type Request struct {
@@ -48,3 +48,7 @@ type Session struct {
 }
 
 func (s *Session) Status() Status { return s.status }
+
+// Done notifies the serialized controller without consuming the exit record.
+// After notification the controller calls Wait before accepting another command.
+func (s *Session) Done() <-chan struct{} { return s.group.done }

@@ -1,18 +1,10 @@
 package serviceuser
 
-import "fmt"
+import "vpn-script/internal/platform/accounts"
 
 const Name = "vpn-nhop"
-const Home = "/nonexistent"
-const Shell = "/usr/sbin/nologin"
+const Home = accounts.Home
+const Shell = accounts.Shell
 
-type Identity struct {
-	UID int
-	GID int
-}
-
-type Command func(...string) ([]byte, error)
-
-func unsafe(reason string) error {
-	return fmt.Errorf("unsafe service identity: %s; inspect account %s before retrying", reason, Name)
-}
+type Identity = accounts.Identity
+type Command = accounts.Command
