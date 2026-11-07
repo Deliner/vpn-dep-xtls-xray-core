@@ -41,6 +41,12 @@ if [[ "$suite" == cronet ]]; then
   printf 'Native build evidence verified; ABI/payload/CVE acceptance remains open: %s\n' "$collection"
   exit 0
 fi
+if [[ "$suite" == client ]]; then
+  bash "$acceptance_root/ops/testing/acceptance/client/collect.sh" "$collection" "$acceptance_commit" "$acceptance_checkout/acceptance"
+  printf 'verified\n' > "$acceptance_output/status"
+  printf 'Native Linux client acceptance verified: %s\n' "$collection"
+  exit 0
+fi
 [[ "$suite" == protocols ]] || exit 2
 for arch in amd64 arm64; do
   report="$collection/acceptance-linux-$arch"

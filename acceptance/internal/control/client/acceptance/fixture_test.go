@@ -63,7 +63,7 @@ func startExit(t *testing.T, directory, password, binary string) {
 	server := model.Object{"log": model.Object{"loglevel": "warning"}, "inbounds": []model.Object{{"listen": "198.51.100.7", "port": 24443,
 		"protocol": "shadowsocks", "settings": model.Object{"method": model.SSMethod, "password": password, "network": "tcp,udp"}}},
 		"outbounds": []model.Object{{"protocol": "freedom", "settings": model.Object{"finalRules": []model.Object{{
-			"action": "allow", "network": "tcp,udp", "ip": []string{"198.18.0.2/32", "2001:db8:feed::2/128"}, "port": "18080,18081"}}}}}}
+			"action": "allow", "network": "tcp,udp", "ip": []string{"198.18.0.2/32", "2001:db8:feed::2/128"}, "port": "443,18080,18081"}}}}}}
 	path := filepath.Join(directory, "exit.json")
 	if err := safeio.JSON(path, server); err != nil {
 		t.Fatal(err)

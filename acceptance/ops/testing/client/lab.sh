@@ -37,9 +37,10 @@ cd "runs/$1"
 printf '%s  package.tar.gz\n' "$2" | sha256sum --check
 tar -xzf package.tar.gz
 sha256sum --check SHA256SUMS
-before_accounts="$(sha256sum /etc/passwd /etc/group)"
-sudo -n unshare --mount --net bash guest.sh "$3" "$4"
-[[ "$(sha256sum /etc/passwd /etc/group)" == "$before_accounts" ]]
+before_host_files="$(sha256sum /etc/passwd /etc/group /etc/ssl/certs/ca-certificates.crt /etc/resolv.conf)"
+if sudo -n unshare --mount --net bash guest.sh "$3" "$4"; then result=0; else result=$?; fi
+[[ "$(sha256sum /etc/passwd /etc/group /etc/ssl/certs/ca-certificates.crt /etc/resolv.conf)" == "$before_host_files" ]]
+exit "$result"
 GUEST
   then result=0; else result=$?; fi
   # Print only after the command's redirection has been unwound, never in EXIT.

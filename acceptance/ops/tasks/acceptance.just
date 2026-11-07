@@ -28,6 +28,11 @@ acceptance-cronet-verify arch candidate:
 acceptance-cronet-payload arch candidate output:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet-payload.sh "$1" "$2" "$3"
 
+# Verify the real Linux client with race instrumentation, system DNS and controller-crash recovery on a native CI CPU.
+[group('acceptance')]
+acceptance-client-run arch:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/client/run.sh "$1"
+
 # Download a completed matching CI run, restore captured Actions policy and independently verify its evidence.
 [group('acceptance')]
 acceptance-collect directory run_id:

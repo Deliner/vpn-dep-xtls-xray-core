@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,6 +21,8 @@ type response struct {
 	DNS    string
 	Routes string
 }
+
+var lookupSequence atomic.Uint64
 
 func TestSessionHelper(t *testing.T) {
 	if os.Getenv("NHOP_SESSION_HELPER") != "1" {
@@ -68,12 +71,8 @@ func operate(operation string, active *session.Session, request session.Request)
 		if active != nil {
 			err = active.Stop(ctx)
 		}
-	case "probe":
-		err = probe("tcp", "198.18.0.2:18080")
-	case "probe6":
-		err = probe("tcp", "[2001:db8:feed::2]:18080")
-	case "probe-udp":
-		err = probe("udp", "198.18.0.2:18081")
+	case "probe", "probe6", "probe-udp", "resolve":
+		err = applicationProbe(ctx, operation)
 	case "dns":
 		return active, response{DNS: dnsState()}
 	case "firewall":
@@ -89,6 +88,26 @@ func operate(operation string, active *session.Session, request session.Request)
 		result.Error = err.Error()
 	}
 	return active, result
+}
+
+func applicationProbe(ctx context.Context, operation string) error {
+	switch operation {
+	case "probe":
+		return probe("tcp", "198.18.0.2:18080")
+	case "probe6":
+		return probe("tcp", "[2001:db8:feed::2]:18080")
+	case "probe-udp":
+		return probe("udp", "198.18.0.2:18081")
+	default:
+		limit, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		name := fmt.Sprintf("q%d-%d.nhop.test", os.Getpid(), lookupSequence.Add(1))
+		addresses, err := net.DefaultResolver.LookupIP(limit, "ip4", name)
+		if err != nil || len(addresses) != 1 || addresses[0].String() != "198.18.0.2" {
+			return fmt.Errorf("system DNS lookup failed or returned wrong origin: %v", err)
+		}
+		return nil
+	}
 }
 
 func routeState() string {

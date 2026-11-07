@@ -59,7 +59,8 @@ func cliCall(t *testing.T, operation string) clientcontrol.Diagnostic {
 
 func cliStart(t *testing.T, profile, runtimes string) (*exec.Cmd, <-chan error, clientcontrol.Diagnostic) {
 	t.Helper()
-	command := cliCommand(t, "start", "--profile", profile, "--runtimes", runtimes, "--ipv6", os.Getenv("NHOP_CLIENT_IPV6"))
+	command := cliCommand(t, "start", "--profile", profile, "--runtimes", runtimes, "--ipv6", os.Getenv("NHOP_CLIENT_IPV6"),
+		"--dns-ip", "198.18.0.2", "--dns-name", "dns.example.invalid")
 	output, err := command.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)

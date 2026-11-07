@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "$(uname -s)" == Linux && "$(hostname)" == lima-payload && "$(id -u)" == 0 ]] || exit 2
+[[ "$(uname -s)" == Linux && "$(id -u)" == 0 ]] || exit 2
+if [[ "$(hostname)" != lima-payload ]]; then
+  [[ "${GITHUB_ACTIONS:-}" == true && "${GITHUB_REPOSITORY:-}" == Deliner/vpn-dep-xtls-xray-core ]] || exit 2
+  case "${NHOP_CLIENT_CI:-}/$(uname -m)" in linux/amd64/x86_64|linux/arm64/aarch64) ;; *) exit 2 ;; esac
+fi
 [[ "$(readlink /proc/self/ns/net)" != "$(readlink /proc/1/ns/net)" ]] || exit 2
 [[ "$(readlink /proc/self/ns/mnt)" != "$(readlink /proc/1/ns/mnt)" ]] || exit 2
 case "${1:-policy}" in
@@ -17,7 +21,17 @@ mount --make-rprivate /
 mkdir -p /run/netns
 mount -t tmpfs nhop-client-test /run/netns
 ip netns add nhop-client-inner
-trap 'ip netns pids nhop-client-inner | xargs -r kill; ip netns delete nhop-client-inner' EXIT
+client_daemons=()
+client_guest_cleanup() {
+  local result=$? pid
+  trap - EXIT
+  ip netns pids nhop-client-inner | xargs -r kill || true
+  # Reap the actual children before logs are hashed by the caller.
+  for pid in "${client_daemons[@]}"; do wait "$pid" || true; done
+  ip netns delete nhop-client-inner || true
+  exit "$result"
+}
+trap client_guest_cleanup EXIT
 ip link set lo up
 ip link add underlay type veth peer name client
 ip link set client netns nhop-client-inner
@@ -43,18 +57,19 @@ if [[ "${1:-}" == resolver ]]; then
 fi
 if [[ "${1:-}" == session || "${1:-}" == public ]]; then
   source ./resolved-guest.sh
-  client_private_resolved
+  client_private_resolved "$1"
 fi
 if [[ "${1:-}" == public ]]; then
-  # NSS mutations are confined to a copied /etc inside this mount namespace.
-  # The guest's original passwd/group/shadow and running services are untouched.
-  cp -a /etc /run/nhop-session-test/etc
-  mount --bind /run/nhop-session-test/etc /etc
+  ip netns exec nhop-client-inner resolvectl dns client 198.51.100.7
+  ip netns exec nhop-client-inner resolvectl default-route client yes
+  ip netns exec nhop-client-inner resolvectl dnsovertls client no
+  ip netns exec nhop-client-inner resolvectl llmnr client no
+  ip netns exec nhop-client-inner resolvectl mdns client no
   mkdir -p /run/nhop-client
   mount -t tmpfs -o mode=0711 nhop-client-control-test /run/nhop-client
   export NHOP_CLIENT_PUBLIC_TEST=private-netns
 fi
 NHOP_CLIENT_KERNEL_TEST=private-netns NHOP_CLIENT_RUNTIME="$PWD/bin" ./network.test \
-  -test.run "$pattern" -test.v -test.timeout=1m
+  -test.run "$pattern" -test.v -test.timeout=2m
 case "${1:-}" in resolver|session|public) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
 if [[ "${1:-}" == session || "${1:-}" == public ]]; then cat bus.log resolved.log; fi

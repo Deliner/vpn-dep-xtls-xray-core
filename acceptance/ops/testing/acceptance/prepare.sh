@@ -5,7 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/identity.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/sources.sh"
 [[ $# -ge 1 && $# -le 2 && "$1" =~ ^build/acceptance/[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || exit 2
 suite="${2:-protocols}"
-case "$suite" in protocols) workflow=workflow.yml ;; cronet) workflow=cronet.yml ;; *) exit 2 ;; esac
+case "$suite" in protocols) workflow=workflow.yml ;; cronet) workflow=cronet.yml ;; client) workflow=client/workflow.yml ;; *) exit 2 ;; esac
 acceptance_identity
 [[ -z "$(git -C "$acceptance_root" status --porcelain --untracked-files=all)" ]] || { printf 'Commit and check the project before preparing CI.\n' >&2; exit 2; }
 for directory in "$acceptance_root/build" "$acceptance_root/build/acceptance"; do

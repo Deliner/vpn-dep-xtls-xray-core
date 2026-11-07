@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -66,8 +67,9 @@ func failEngine(t *testing.T, c *controller, failure string, started response) {
 func checkIsolation(t *testing.T) {
 	t.Helper()
 	hostname, err := os.Hostname()
-	if err != nil || hostname != "lima-payload" || os.Geteuid() != 0 {
-		t.Fatal("session acceptance requires owned root Linux guest")
+	ci := os.Getenv("GITHUB_ACTIONS") == "true" && os.Getenv("GITHUB_REPOSITORY") == "Deliner/vpn-dep-xtls-xray-core" && os.Getenv("NHOP_CLIENT_CI") == "linux/"+runtime.GOARCH
+	if err != nil || hostname != "lima-payload" && !ci || runtime.GOOS != "linux" || os.Geteuid() != 0 {
+		t.Fatal("session acceptance requires an owned root Linux guest or runner")
 	}
 	for _, namespace := range []string{"net", "mnt"} {
 		self, err := os.Readlink("/proc/self/ns/" + namespace)
@@ -76,4 +78,5 @@ func checkIsolation(t *testing.T) {
 			t.Fatal("session acceptance requires private namespaces")
 		}
 	}
+	t.Logf("native client acceptance: %s/%s; private mount and network namespaces", runtime.GOOS, runtime.GOARCH)
 }
