@@ -76,7 +76,7 @@ func operate(operation string, active *session.Session, request session.Request)
 	case "dns":
 		return active, response{DNS: dnsState()}
 	case "firewall":
-		result, runErr := process.Run(ctx, time.Second, "nft", "--handle", "list", "table", "inet", "nhop_client")
+		result, runErr := process.Run(ctx, time.Second, "nft", "--json", "--handle", "list", "table", "inet", "nhop_client")
 		return active, response{DNS: string(result.Output), Error: fmt.Sprint(runErr)}
 	case "routes":
 		return active, response{Routes: routeState()}

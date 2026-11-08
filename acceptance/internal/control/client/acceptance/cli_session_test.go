@@ -1,6 +1,7 @@
 package acceptance
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	clientcontrol "vpn-script/internal/control/client/controller"
+	"vpn-script/internal/control/client/guard"
 	"vpn-script/internal/control/client/host"
 	"vpn-script/internal/control/client/session"
 	"vpn-script/internal/platform/safeio"
@@ -207,4 +209,79 @@ func sessionNames(t *testing.T) string {
 		names = append(names, entry.Name())
 	}
 	return strings.Join(names, ",")
+}
+
+func verifyGuardIntent(t *testing.T, pending clientcontrol.Diagnostic, probe *controller, stage string) guard.Lease {
+	t.Helper()
+	intent := pending.Status.Guard
+	if pending.Controller != "unavailable" || pending.Status.Phase != "starting" || !strings.HasPrefix(intent.Token, "nhop:") || len(intent.Token) != 37 || intent.Handle != 0 {
+		t.Fatal("firewall intent was not recorded before mutation", pending)
+	}
+	if pending.Status.NativePID != 0 || pending.Status.FrontendPID != 0 {
+		t.Fatal("an engine started before its firewall lease was committed")
+	}
+	checkTraffic(t, probe, stage == "before")
+	var installed guard.Lease
+	if stage == "after" {
+		installed = observedGuard(t, probe)
+		if installed.Token != intent.Token || installed.Handle == 0 {
+			t.Fatal("kernel transaction did not use the previously recorded intent", installed)
+		}
+	}
+	t.Logf("planned guard crash: stage=%s token=%s handle=0 observed_handle=%d", stage, intent.Token, installed.Handle)
+	return installed
+}
+
+func resumeGuardIntent(t *testing.T, pending clientcontrol.Diagnostic, probe *controller, stage string, installed guard.Lease, dns *dnsOrigins) {
+	t.Helper()
+	canary := directCanary(t)
+	var watch *leakWatch
+	if stage == "after" {
+		watch = startLeakWatch(t)
+	}
+	_, done, resumed := cliForeground(t, "resume")
+	if resumed.Error != "" || resumed.Status.Phase != "running" || resumed.Directory != pending.Directory || resumed.Status.Guard.Token != pending.Status.Guard.Token || resumed.Status.Guard.Handle == 0 {
+		t.Fatal("planned firewall identity was not retained by resume", resumed)
+	}
+	if installed.Handle != 0 && resumed.Status.Guard != installed {
+		t.Fatal("resume replaced the previously installed firewall", resumed.Status.Guard, installed)
+	}
+	if watch == nil {
+		watch = startLeakWatch(t)
+	}
+	activeTraffic(t, probe)
+	checkSystemDNS(t, probe, dns, "tunnel")
+	// Fast local probes may finish before the monitor sends twenty datagrams.
+	time.Sleep(100 * time.Millisecond)
+	watch.stop(t)
+	if watch.attempts < 20 || canary.Load() != 0 {
+		t.Fatalf("planned guard UDP control: attempts=%d delivered=%d", watch.attempts, canary.Load())
+	}
+	t.Logf("planned guard resumed: stage=%s token=%s handle=%d attempts=%d delivered=0", stage, resumed.Status.Guard.Token, resumed.Status.Guard.Handle, watch.attempts)
+	if result := cliCall(t, "stop"); result.Error != "" || result.Status.Phase != "stopped" {
+		t.Fatal("resumed planned guard did not stop", result)
+	}
+	cliWait(t, done, true)
+}
+
+func observedGuard(t *testing.T, probe *controller) guard.Lease {
+	t.Helper()
+	var listing struct {
+		NFTables []struct {
+			Table *struct {
+				Name, Family, Comment string
+				Handle                uint64
+			}
+		}
+	}
+	if err := json.Unmarshal([]byte(probe.call(t, "firewall").DNS), &listing); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range listing.NFTables {
+		if table := item.Table; table != nil && table.Name == "nhop_client" && table.Family == "inet" {
+			return guard.Lease{Token: table.Comment, Handle: table.Handle}
+		}
+	}
+	t.Fatal("expected installed firewall table was not observed")
+	return guard.Lease{}
 }

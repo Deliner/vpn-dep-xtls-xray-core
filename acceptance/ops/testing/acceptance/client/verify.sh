@@ -12,13 +12,48 @@ client_verify_build() {
 client_verify_public() {
   local mode="$1" policy="$2" failure expected
   grep -q "client policy: IPv6=$policy" "$mode/guest.log" || return 1
-  for failure in graceful native controller-term controller-kill reconnect-native reconnect-frontend resume-term resume-kill; do
+  for failure in graceful native controller-term controller-kill reconnect-native reconnect-frontend resume-term resume-kill \
+    intent-before-resume intent-after-resume intent-before-stop intent-after-stop; do
     expected="--- PASS: TestKernelPublicClientAndControllerRecovery/$failure "
-    awk -v expected="$expected" 'index($0, expected) { found=1 } END { exit !found }' "$mode/guest.log" || return 1
+    awk -v expected="$expected" 'index($0, expected) { count++ } END { exit count != 1 }' "$mode/guest.log" || return 1
   done
   for phase in direct tunnel blocked; do grep -q "system DNS $phase:" "$mode/guest.log" || return 1; done
   awk '/reconnect direct UDP: attempts=[0-9]+ delivered=0; same firewall lease retained/ { count++ } END { exit count != 2 }' "$mode/guest.log" || return 1
   awk '/resume direct UDP: attempts=[0-9]+ delivered=0; same firewall lease retained/ { count++ } END { exit count != 2 }' "$mode/guest.log" || return 1
+  awk '/^--- PASS: TestKernelPublicClientAndControllerRecovery \(/ { root++ }
+    /^PASS$/ { complete++ } /--- (FAIL|SKIP):/ || /^FAIL$/ { bad=1 }
+    END { exit bad || root != 1 || complete != 1 }' "$mode/guest.log" || return 1
+  client_verify_dns "$mode/guest.log" 26 18 13 0 || return 1
+  client_verify_intents "$mode/guest.log" || return 1
+}
+
+client_verify_intents() {
+  awk '
+  /planned guard crash:/ {
+    value=$0; sub(/^.*planned guard crash: /,"",value); if (split(value,f,/ +/)!=4) bad=1
+    stage=f[1]; sub(/^stage=/,"",stage); token=f[2]; sub(/^token=/,"",token)
+    handle=f[4]; sub(/^observed_handle=/,"",handle)
+    if (f[1] !~ /^stage=(before|after)$/ || f[2] !~ /^token=nhop:[0-9a-f]+$/ || length(token)!=37 || f[3]!="handle=0" || f[4] !~ /^observed_handle=[0-9]+$/) bad=1
+    if (seen[token]++ || (stage=="before" && handle+0!=0) || (stage=="after" && handle+0==0)) bad=1
+    tokens[stage]=token; handles[stage]=handle+0; crashes[stage]++
+  }
+  /planned guard resumed:/ {
+    value=$0; sub(/^.*planned guard resumed: /,"",value); if (split(value,f,/ +/)!=5) bad=1
+    stage=f[1]; sub(/^stage=/,"",stage); token=f[2]; sub(/^token=/,"",token)
+    handle=f[3]; sub(/^handle=/,"",handle); attempts=f[4]; sub(/^attempts=/,"",attempts)
+    if (f[1] !~ /^stage=(before|after)$/ || f[2] !~ /^token=nhop:[0-9a-f]+$/ || token!=tokens[stage] || f[3] !~ /^handle=[0-9]+$/ || handle+0==0 || f[4] !~ /^attempts=[0-9]+$/ || attempts+0<20 || f[5]!="delivered=0") bad=1
+    if (stage=="after" && handle+0!=handles[stage]) bad=1
+    resumed[stage]++
+  }
+  /planned guard recovery verified:/ {
+    value=$0; sub(/^.*planned guard recovery verified: /,"",value); verified[value]++
+    if (value !~ /^stage=(before|after) action=(resume|stop)$/) bad=1
+  }
+  END {
+    if (crashes["before"]!=2 || crashes["after"]!=2 || resumed["before"]!=1 || resumed["after"]!=1) bad=1
+    if (verified["stage=before action=resume"]!=1 || verified["stage=after action=resume"]!=1 || verified["stage=before action=stop"]!=1 || verified["stage=after action=stop"]!=1) bad=1
+    exit bad
+  }' "$1" || return 1
 }
 
 client_verify_systemd() {

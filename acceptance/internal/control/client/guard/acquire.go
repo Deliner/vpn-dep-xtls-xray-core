@@ -2,7 +2,6 @@ package guard
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"os"
 	"time"
@@ -13,13 +12,19 @@ import (
 // Acquire uses an exclusive create in one nft transaction. Existing tables are
 // never merged, flushed or adopted. The lease survives process failure.
 func (m *Manager) Acquire(ctx context.Context, value profile.Imported, options network.Options) (Lease, error) {
+	return m.AcquireReserved(ctx, value, options, NewIntent())
+}
+
+// AcquireReserved applies a previously persisted intention with the same
+// exclusive transaction as Acquire. It never replaces an existing table.
+func (m *Manager) AcquireReserved(ctx context.Context, value profile.Imported, options network.Options, lease Lease) (Lease, error) {
+	if lease.Handle != 0 || !tokenPattern.MatchString(lease.Token) {
+		return Lease{}, fmt.Errorf("firewall acquisition requires a reserved identity without a handle")
+	}
 	policy, err := network.Firewall(value, options)
 	if err != nil {
 		return Lease{}, err
 	}
-	var token [16]byte
-	rand.Read(token[:])
-	lease := Lease{Token: fmt.Sprintf("nhop:%x", token)}
 	// nft's create-table operation ignores nested chain/rule declarations. Use
 	// an exclusive empty table followed by the full policy in ONE transaction.
 	policy = fmt.Sprintf("create table inet %s { comment %q; }\n", network.Table, lease.Token) + policy

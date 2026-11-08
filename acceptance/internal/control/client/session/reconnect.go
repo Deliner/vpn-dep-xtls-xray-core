@@ -15,7 +15,7 @@ func Resume(ctx context.Context, request Request, status Status) (*Session, erro
 		return nil, fmt.Errorf("resume requires Linux root")
 	}
 	if !resumable(status) {
-		return nil, fmt.Errorf("resume requires an interrupted session with a recorded firewall lease")
+		return nil, fmt.Errorf("resume requires an interrupted session with a recorded firewall intent or lease")
 	}
 	if err := verifySnapshot(request); err != nil {
 		return nil, err
@@ -27,17 +27,26 @@ func Resume(ctx context.Context, request Request, status Status) (*Session, erro
 	if err != nil {
 		return nil, err
 	}
+	if !s.protected {
+		s.status.Guard = status.Guard
+		if err := s.protect(ctx); err != nil {
+			return s, s.failed(err)
+		}
+	}
 	// The old processes are gone; their recorded numeric IDs carry no authority.
 	s.status.Phase, s.status.NativePID, s.status.FrontendPID = "failed-closed", 0, 0
+	if err := s.save(); err != nil {
+		return s, s.failed(err)
+	}
 	return s, s.Reconnect(ctx)
 }
 
 func resumable(status Status) bool {
-	if status.Guard.Token == "" || status.Guard.Handle == 0 {
+	if status.Guard.Token == "" {
 		return false
 	}
 	switch status.Phase {
-	case "starting", "running", "reconnecting", "failed-closed":
+	case "starting", "running", "reconnecting", "failed-closed", "failed":
 		return true
 	default:
 		return false

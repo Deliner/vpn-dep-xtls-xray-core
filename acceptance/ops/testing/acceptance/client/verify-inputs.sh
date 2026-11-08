@@ -13,10 +13,9 @@ client_verify_manifest() {
 
 client_verify_inputs() {
   local kind="$1" mode="$2" name engine digest
-  local names=(network.test guest.sh resolved-guest.sh bin/xray bin/sing-box bin/libcronet.so)
+  local names=(network.test guest.sh resolved-guest.sh bin/xray bin/sing-box bin/libcronet.so bin/nhop-client)
   if [[ "$kind" == systemd || "$kind" == installed ]]; then names+=(systemd-guest.sh); fi
   if [[ "$kind" == installed ]]; then names+=(installed-guest.sh); fi
-  if [[ "$kind" != public ]]; then names+=(bin/nhop-client); fi
   [[ "$(cat "$mode/status")" == passed ]] || return 1
   for name in "${names[@]}"; do
     [[ -f "$mode/$name" && ! -L "$mode/$name" && -s "$mode/$name" ]] || return 1
@@ -33,9 +32,7 @@ client_verify_inputs() {
   if [[ "$kind" == installed ]]; then
     cmp "$mode/installed-guest.sh" "$source_root/ops/testing/client/install/managed-guest.sh" || return 1
   fi
-  if [[ "$kind" != public ]]; then
-    cmp "$mode/bin/nhop-client" "$report/nhop-client" || return 1
-  fi
+  cmp "$mode/bin/nhop-client" "$report/nhop-client" || return 1
   for name in xray sing-box libcronet.so; do
     engine=sing-box
     if [[ "$name" == xray ]]; then engine=xray; fi

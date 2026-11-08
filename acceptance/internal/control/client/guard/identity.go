@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -98,7 +97,7 @@ func (m *Manager) inspect(ctx context.Context) (Lease, error) {
 // prevents a same-name replacement between inspection and deletion from being
 // deleted. Do not call this on an unexpected client/engine shutdown.
 func (m *Manager) Release(ctx context.Context, lease Lease) error {
-	if !regexp.MustCompile(`^nhop:[0-9a-f]{32}$`).MatchString(lease.Token) || lease.Handle == 0 {
+	if !tokenPattern.MatchString(lease.Token) || lease.Handle == 0 {
 		return fmt.Errorf("invalid kill switch lease")
 	}
 	current, err := m.inspect(ctx)

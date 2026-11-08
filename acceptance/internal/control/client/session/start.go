@@ -43,19 +43,31 @@ func Start(ctx context.Context, request Request) (*Session, error) {
 }
 
 func (s *Session) activate(ctx context.Context) error {
+	if err := s.protect(ctx); err != nil {
+		return err
+	}
+	return s.launch(ctx)
+}
+
+// protect writes the nonce before the exclusive nft transaction. If the
+// controller dies before recording the kernel handle, recovery can distinguish
+// this exact intended table from an unrelated table with the same public name.
+func (s *Session) protect(ctx context.Context) error {
+	if s.status.Guard == (guard.Lease{}) {
+		s.status.Guard = guard.NewIntent()
+	}
 	if err := s.save(); err != nil {
 		return err
 	}
-	var err error
-	s.status.Guard, err = s.guard.Acquire(ctx, s.request.Profile, s.request.Network)
+	lease, err := s.guard.AcquireReserved(ctx, s.request.Profile, s.request.Network, s.status.Guard)
+	if lease.Token != "" {
+		s.status.Guard = lease
+	}
 	if err != nil {
 		return err
 	}
 	s.protected = true
-	if err := s.save(); err != nil {
-		return err
-	}
-	return s.launch(ctx)
+	return s.save()
 }
 
 func (s *Session) launch(ctx context.Context) error {

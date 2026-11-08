@@ -131,13 +131,17 @@ func TestKernelPublicClientAndControllerRecovery(t *testing.T) {
 	origin(t, "[2001:db8:feed::2]:18080")
 	udpOrigin(t)
 	dns := startDNSOrigins(t)
-	for _, failure := range []string{"graceful", "native", "controller-term", "controller-kill", "reconnect-native", "reconnect-frontend", "resume-term", "resume-kill"} {
+	for _, failure := range []string{"graceful", "native", "controller-term", "controller-kill", "reconnect-native", "reconnect-frontend", "resume-term", "resume-kill", "intent-before-resume", "intent-after-resume", "intent-before-stop", "intent-after-stop"} {
 		t.Run(failure, func(t *testing.T) { publicLifecycle(t, failure, dns) })
 	}
 }
 
 func publicLifecycle(t *testing.T, failure string, dns *dnsOrigins) {
 	t.Helper()
+	if strings.HasPrefix(failure, "intent-") {
+		intentLifecycle(t, strings.TrimPrefix(failure, "intent-"), dns)
+		return
+	}
 	request := fixture(t)
 	probe, initial := newController(t, request)
 	checkSystemDNS(t, probe, dns, "direct")
@@ -166,4 +170,31 @@ func publicLifecycle(t *testing.T, failure string, dns *dnsOrigins) {
 	}
 	failPublic(t, probe, command, done, started, failure)
 	finishPublic(t, probe, initial, done, failure, dns)
+}
+
+func intentLifecycle(t *testing.T, failure string, dns *dnsOrigins) {
+	t.Helper()
+	request := fixture(t)
+	probe, initial := newController(t, request)
+	checkSystemDNS(t, probe, dns, "direct")
+	profile, runtimes := cliInputs(t, request)
+	stage, action, _ := strings.Cut(failure, "-")
+	pending := crashGuard(t, profile, runtimes, stage)
+	installed := verifyGuardIntent(t, pending, probe, stage)
+	phase := "direct"
+	if stage == "after" {
+		phase = "blocked"
+	}
+	checkSystemDNS(t, probe, dns, phase)
+	if action == "resume" {
+		resumeGuardIntent(t, pending, probe, stage, installed, dns)
+	} else if result := cliCall(t, "stop"); result.Error != "" || result.Status.Phase != "stopped" {
+		t.Fatal("planned guard explicit stop failed", result)
+	}
+	checkTraffic(t, probe, true)
+	checkSystemDNS(t, probe, dns, "direct")
+	if probe.call(t, "dns").DNS != initial.DNS || probe.call(t, "routes").Routes != initial.Routes {
+		t.Fatal("planned guard recovery did not restore baseline")
+	}
+	t.Logf("planned guard recovery verified: stage=%s action=%s", stage, action)
 }

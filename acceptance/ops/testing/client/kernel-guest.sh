@@ -86,6 +86,7 @@ if [[ "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == installed || "${1
     mount -t tmpfs -o mode=0711 nhop-client-control-test /run/nhop-client
   fi
   export NHOP_CLIENT_PUBLIC_TEST=private-netns
+  if [[ "${1:-}" == public ]]; then export NHOP_CLIENT_BINARY="$PWD/bin/nhop-client"; fi
 fi
 if [[ "${1:-}" == systemd || "${1:-}" == installed ]]; then
   client_systemd_prepare

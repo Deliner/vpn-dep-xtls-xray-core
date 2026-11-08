@@ -18,9 +18,7 @@ client_scenario() {
   if [[ "$kind" == installed ]]; then
     cp ops/testing/client/install/managed-guest.sh "$mode/installed-guest.sh"
   fi
-  if [[ "$kind" != public ]]; then
-    cp "$report/nhop-client" "$mode/bin/nhop-client"
-  fi
+  cp "$report/nhop-client" "$mode/bin/nhop-client"
   (cd "$mode"; sha256sum network.test guest.sh *-guest.sh bin/*) > "$mode/inputs.sha256"
   client_host_baseline > "$mode/host-before.txt" || return 1
   (cd "$mode"; sudo -n env GITHUB_ACTIONS=true GITHUB_REPOSITORY="$GITHUB_REPOSITORY" NHOP_CLIENT_CI="linux/$arch" \

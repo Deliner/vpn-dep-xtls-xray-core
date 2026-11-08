@@ -33,31 +33,40 @@ func Recover(ctx context.Context, request Request, status Status) (*Session, err
 	}
 	s.guard, _ = guard.New()
 	s.dns, _ = resolver.New()
-	if err := s.guard.Verify(ctx, status.Guard); err != nil {
-		return nil, err
-	}
-	var err error
-	s.routes, err = recoveryRoutes(ctx, request, status.Guard)
-	if err != nil {
+	if err := s.recoverProtection(ctx); err != nil {
 		return nil, err
 	}
 	path := filepath.Join(request.Directory, "session.lock")
 	if err := safeio.CheckAccess(path, 0600, 0, 0); err != nil {
 		return nil, err
 	}
+	var err error
 	s.lock, err = safeio.Lock(path)
 	if err != nil {
 		return nil, err
 	}
-	s.protected = status.Guard != (guard.Lease{})
 	return s, nil
+}
+
+func (s *Session) recoverProtection(ctx context.Context) error {
+	lease, err := s.guard.Resolve(ctx, s.status.Guard)
+	if err != nil {
+		return err
+	}
+	routes, err := recoveryRoutes(ctx, s.request, s.status.Guard)
+	if err != nil {
+		return err
+	}
+	s.routes, s.status.Guard = routes, lease
+	s.protected = lease != (guard.Lease{})
+	return nil
 }
 
 func recoveryRoutes(ctx context.Context, request Request, lease guard.Lease) (*routing.Manager, error) {
 	entry, iface, ipv6 := request.Profile.Metadata.EntryEndpoint.Address, request.Network.Interface, request.Network.IPv6 == "tunnel"
-	if lease == (guard.Lease{}) {
+	if lease.Handle == 0 {
 		// Routes cannot have been installed before acquiring the guard. Without a
-		// recorded lease, require vacancy instead of adopting matching selectors.
+		// completed lease, require vacancy instead of adopting matching selectors.
 		return routing.New(ctx, entry, iface, ipv6)
 	}
 	return routing.Recorded(entry, iface, ipv6)
@@ -82,6 +91,11 @@ func (s *Session) Wait(ctx context.Context) error {
 func (s *Session) Stop(ctx context.Context) error {
 	if s.status.Phase == "stopped" {
 		return nil
+	}
+	if s.status.Guard.Handle == 0 {
+		if err := s.recoverProtection(ctx); err != nil {
+			return err
+		}
 	}
 	err := s.restoreDNS(ctx)
 	s.group.stop()
