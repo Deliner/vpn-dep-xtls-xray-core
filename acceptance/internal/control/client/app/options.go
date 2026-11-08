@@ -44,7 +44,7 @@ func (value *options) flags(command string, flags *flag.FlagSet) error {
 		} else {
 			flags.StringVar(&value.runtimes, "runtimes", "", "trusted runtime paths and SHA-256 inventory")
 		}
-	case "diagnostics", "stop":
+	case "diagnostics", "stop", "reconnect":
 	default:
 		return fmt.Errorf("unknown client command")
 	}

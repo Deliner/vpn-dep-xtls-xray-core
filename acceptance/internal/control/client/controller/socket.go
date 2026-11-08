@@ -60,7 +60,7 @@ func (s *socket) handle(ctx context.Context, connection *net.UnixConn) {
 	decoder := json.NewDecoder(io.LimitReader(connection, 1024))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&value) != nil || decoder.Decode(new(any)) != io.EOF || !operation(value.Operation) {
-		_ = write(connection, Diagnostic{Error: "expected one diagnostics or stop request"})
+		_ = write(connection, Diagnostic{Error: "expected one diagnostics, reconnect or stop request"})
 		return
 	}
 	connection.SetDeadline(time.Now().Add(15 * time.Second))
@@ -84,7 +84,9 @@ func (s *socket) close() {
 	<-s.finished
 }
 
-func operation(value string) bool { return value == "diagnostics" || value == "stop" }
+func operation(value string) bool {
+	return value == "diagnostics" || value == "stop" || value == "reconnect"
+}
 
 func write(output io.Writer, value Diagnostic) error {
 	if err := json.NewEncoder(output).Encode(value); err != nil {

@@ -18,6 +18,11 @@ client-start profile runtimes ipv6='tunnel':
 client-diagnostics:
     ./build/bin/nhop-client diagnostics
 
+# MUTATES LINUX CLIENT NETWORK: reconnect a failed session while retaining the same kill switch.
+[group('client')]
+client-reconnect:
+    ./build/bin/nhop-client reconnect
+
 # MUTATES LINUX CLIENT NETWORK: explicitly stop or recover the owned session and restore ordinary networking.
 [group('client')]
 client-stop:

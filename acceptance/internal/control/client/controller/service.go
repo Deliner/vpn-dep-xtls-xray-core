@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -50,10 +51,10 @@ func serve(ctx context.Context, owner *host.Owner, value session.Request, output
 	if err := write(output, initial); err != nil {
 		return err
 	}
-	return run(ctx, control.calls, active, initial)
+	return run(ctx, control.calls, active, initial, value)
 }
 
-func run(ctx context.Context, calls <-chan call, active *session.Session, state Diagnostic) error {
+func run(ctx context.Context, calls <-chan call, active *session.Session, state Diagnostic, request session.Request) error {
 	var done <-chan struct{}
 	if active.Status().Phase == "running" {
 		done = active.Done()
@@ -66,19 +67,47 @@ func run(ctx context.Context, calls <-chan call, active *session.Session, state 
 			state = diagnostic(active, state.Directory, active.Wait(ctx))
 			done = nil
 		case c := <-calls:
-			if c.operation == "stop" {
-				limit, cancel := context.WithTimeout(context.Background(), 12*time.Second)
-				state = diagnostic(active, state.Directory, active.Stop(limit))
-				cancel()
-				done = nil
+			response := controlSession(ctx, active, state, c.operation, request)
+			if response.Status.Phase != "running" || response.Error == "" {
+				state = response
 			}
-			c.reply <- state
+			done = nil
+			if state.Status.Phase == "running" {
+				done = active.Done()
+			}
+			c.reply <- response
 			if state.Status.Phase == "stopped" {
 				<-c.finished // Deliver the stop acknowledgement before closing the socket.
 				return nil
 			}
 		}
 	}
+}
+
+func controlSession(ctx context.Context, active *session.Session, state Diagnostic, operation string, request session.Request) Diagnostic {
+	if operation == "diagnostics" {
+		return state
+	}
+	if operation == "reconnect" {
+		limit, cancel := context.WithTimeout(ctx, 12*time.Second)
+		defer cancel()
+		return diagnostic(active, state.Directory, reconnect(limit, active, request))
+	}
+	// Explicit stop keeps its independent cleanup budget after cancellation.
+	cleanup, finish := context.WithTimeout(context.Background(), 12*time.Second)
+	defer finish()
+	return diagnostic(active, state.Directory, active.Stop(cleanup))
+}
+
+func reconnect(ctx context.Context, active *session.Session, request session.Request) error {
+	identity, err := host.ExistingIdentity(ctx)
+	if err != nil {
+		return err
+	}
+	if identity.UID != request.Network.EngineUID || identity.GID != request.EngineGID {
+		return fmt.Errorf("client NSS identity changed; reconnect refused with protection retained")
+	}
+	return active.Reconnect(ctx)
 }
 
 func diagnostic(active *session.Session, directory string, err error) Diagnostic {

@@ -71,7 +71,7 @@ func operate(operation string, active *session.Session, request session.Request)
 		if active != nil {
 			err = active.Stop(ctx)
 		}
-	case "probe", "probe6", "probe-udp", "resolve":
+	case "probe", "probe6", "probe-udp", "probe-direct", "resolve":
 		err = applicationProbe(ctx, operation)
 	case "dns":
 		return active, response{DNS: dnsState()}
@@ -98,6 +98,8 @@ func applicationProbe(ctx context.Context, operation string) error {
 		return probe("tcp", "[2001:db8:feed::2]:18080")
 	case "probe-udp":
 		return probe("udp", "198.18.0.2:18081")
+	case "probe-direct":
+		return probe("udp", "198.51.100.7:18082")
 	default:
 		limit, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()

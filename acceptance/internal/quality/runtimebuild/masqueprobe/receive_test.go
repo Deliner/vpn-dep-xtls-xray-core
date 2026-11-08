@@ -1,4 +1,4 @@
-package runtimebuild
+package masqueprobe
 
 import (
 	"bytes"
@@ -61,11 +61,14 @@ func TestBudgetProbeDoesNotChangeQueueAdmission(t *testing.T) {
 
 func TestProbeRejectsUnreviewedSourceWithoutReplacingFiles(t *testing.T) {
 	directory := t.TempDir()
-	source := filepath.Join(directory, "source.go")
+	if err := os.Mkdir(filepath.Join(directory, "http3"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(directory, "http3", "state_tracking_stream.go")
 	if err := os.WriteFile(source, []byte(queueFixture), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := MasqueOverlay(source, directory); err == nil {
+	if err := Overlay(directory, directory); err == nil {
 		t.Fatal("probe accepted a changed dependency source")
 	}
 	actual, err := os.ReadFile(source)
@@ -74,17 +77,5 @@ func TestProbeRejectsUnreviewedSourceWithoutReplacingFiles(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(directory, "overlay.json")); !os.IsNotExist(err) {
 		t.Fatal("rejected probe published an overlay")
-	}
-}
-
-func TestDiagnosticBuildCannotEnterCandidateAudit(t *testing.T) {
-	f := auditFixture(t, "xray")
-	write(t, filepath.Join(f.root, outputDirectory, "status"), []byte("diagnostic-built\n"), 0600)
-	output, err := boundedCommand(t, f.command("audit-candidate.sh", outputDirectory))
-	if err == nil || !strings.Contains(string(output), "Candidate build is incomplete") {
-		t.Fatalf("diagnostic was accepted as a completed candidate: %v, %s", err, output)
-	}
-	if _, err := os.Stat(f.trace); !os.IsNotExist(err) {
-		t.Fatal("candidate scanner ran for a diagnostic-only build")
 	}
 }

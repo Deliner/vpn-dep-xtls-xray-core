@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"vpn-script/internal/platform/process"
+	"vpn-script/internal/platform/safeio"
 	"vpn-script/internal/runtime/engines"
 )
 
 func (g *children) start(request Request, name, engine string, unprivileged bool) (int, error) {
-	log, err := os.OpenFile(filepath.Join(request.Directory, name+".log"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	log, err := childLog(filepath.Join(request.Directory, name+".log"))
 	if err != nil {
 		return 0, err
 	}
@@ -30,6 +31,18 @@ func (g *children) start(request Request, name, engine string, unprivileged bool
 	g.waiters.Add(1)
 	go g.reap(command, name, log)
 	return command.Process.Pid, nil
+}
+
+func childLog(path string) (*os.File, error) {
+	if _, err := os.Lstat(path); os.IsNotExist(err) {
+		return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	}
+	if err := safeio.CheckAccess(path, 0600, os.Geteuid(), os.Getegid()); err != nil {
+		return nil, err
+	}
+	// The previous generation has been reaped. Retain its diagnostics across
+	// reconnects; a special file, symlink or changed owner is never adopted.
+	return os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0600)
 }
 
 func (g *children) reap(command *exec.Cmd, name string, log *os.File) {

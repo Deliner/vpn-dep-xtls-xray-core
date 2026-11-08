@@ -30,6 +30,15 @@ func Identity(ctx context.Context) (accounts.Identity, error) {
 	return identity(ctx, process.Run)
 }
 
+// ExistingIdentity validates the current NSS record without creating an account.
+// Reconnect must not borrow a numeric identity reassigned since the initial start.
+func ExistingIdentity(ctx context.Context) (accounts.Identity, error) {
+	if err := LinuxRoot(); err != nil {
+		return accounts.Identity{}, err
+	}
+	return inspectIdentity(ctx, process.Run)
+}
+
 func identity(ctx context.Context, run process.Runner) (accounts.Identity, error) {
 	result, err := run(ctx, 5*time.Second, "getent", "passwd", Account)
 	if err != nil || !result.Success {
@@ -44,6 +53,10 @@ func identity(ctx context.Context, run process.Runner) (accounts.Identity, error
 			return accounts.Identity{}, fmt.Errorf("cannot create dedicated client account; inspect NSS before retrying")
 		}
 	}
+	return inspectIdentity(ctx, run)
+}
+
+func inspectIdentity(ctx context.Context, run process.Runner) (accounts.Identity, error) {
 	command := func(args ...string) ([]byte, error) {
 		result, err := run(ctx, 5*time.Second, args...)
 		if err != nil || !result.Success {

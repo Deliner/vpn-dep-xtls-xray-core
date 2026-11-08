@@ -47,3 +47,33 @@ func TestActivationRefusesNonLinuxWithoutChangingHost(t *testing.T) {
 		t.Fatal("platform refusal modified the filesystem")
 	}
 }
+
+func TestReconnectRequiresExactConfigurationBytesAndPermissions(t *testing.T) {
+	directory, value := t.TempDir(), map[string]any{"tag": "private", "password": "<secret>"}
+	path := filepath.Join(directory, "frontend.json")
+	if err := safeio.NewJSON(path, value); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyConfiguration(directory, "frontend.json", value, 0600, os.Getegid()); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(raw, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyConfiguration(directory, "frontend.json", value, 0600, os.Getegid()); err == nil {
+		t.Fatal("changed snapshot bytes were accepted")
+	}
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyConfiguration(directory, "frontend.json", value, 0600, os.Getegid()); err == nil {
+		t.Fatal("world-readable snapshot was accepted")
+	}
+}

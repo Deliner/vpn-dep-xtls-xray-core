@@ -25,6 +25,18 @@ func boundedCommand(t *testing.T, command *exec.Cmd) ([]byte, error) {
 	return output, err
 }
 
+func TestDiagnosticBuildCannotEnterCandidateAudit(t *testing.T) {
+	f := auditFixture(t, "xray")
+	write(t, filepath.Join(f.root, outputDirectory, "status"), []byte("diagnostic-built\n"), 0600)
+	output, err := boundedCommand(t, f.command("audit-candidate.sh", outputDirectory))
+	if err == nil || !strings.Contains(string(output), "Candidate build is incomplete") {
+		t.Fatalf("diagnostic was accepted as a completed candidate: %v, %s", err, output)
+	}
+	if _, err := os.Stat(f.trace); !os.IsNotExist(err) {
+		t.Fatal("candidate scanner ran for a diagnostic-only build")
+	}
+}
+
 func TestCandidateAuditRejectsSpecialFilesBeforeScanning(t *testing.T) {
 	for _, kind := range []string{"fifo-source", "fifo-bin", "socket"} {
 		t.Run(kind, func(t *testing.T) {

@@ -55,6 +55,11 @@ func (s *Session) activate(ctx context.Context) error {
 	if err := s.save(); err != nil {
 		return err
 	}
+	return s.launch(ctx)
+}
+
+func (s *Session) launch(ctx context.Context) error {
+	var err error
 	s.status.NativePID, err = s.group.start(s.request, "native", s.request.Profile.Metadata.Engine, true)
 	if err != nil {
 		return err

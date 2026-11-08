@@ -41,3 +41,30 @@ func TestShutdownReapsRemainingChildAfterExitNoticeWasConsumed(t *testing.T) {
 	}
 	group.stop() // Repeated cleanup must not signal potentially reused PIDs.
 }
+
+func TestReconnectLogsAppendWithoutAdoptingSymlinks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "native.log")
+	for _, line := range []string{"first\n", "second\n"} {
+		log, err := childLog(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = log.WriteString(line)
+		closeErr := log.Close()
+		if err != nil || closeErr != nil {
+			t.Fatal(err, closeErr)
+		}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != "first\nsecond\n" {
+		t.Fatal("reconnect lost prior process diagnostics", err)
+	}
+	alias := filepath.Join(filepath.Dir(path), "alias.log")
+	if err := os.Symlink(path, alias); err != nil {
+		t.Fatal(err)
+	}
+	if log, err := childLog(alias); err == nil {
+		log.Close()
+		t.Fatal("log reopen followed a symlink")
+	}
+}

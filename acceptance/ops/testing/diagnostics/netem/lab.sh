@@ -18,7 +18,8 @@ mkdir "$run/experiment" "$run/experiment/bin"
 GOOS=linux GOARCH="$lab_arch" CGO_ENABLED=0 go test -c -trimpath -buildvcs=false \
   -o "$run/experiment/network.test" ./internal/control/diagnostics/masque
 cp "$probe/bin/xray" "$run/experiment/bin/xray"
-cp "$probe/provenance.txt" "$probe/control.log" "$run/experiment/"
+cp "$probe/provenance.txt" "$probe/control.log" "$probe/probe.json" "$run/experiment/"
+if [[ -f "$probe/send-control.log" ]]; then cp "$probe/send-control.log" "$run/experiment/"; fi
 cp ops/testing/diagnostics/netem/guest.sh ops/testing/diagnostics/netem/namespace.sh "$run/experiment/"
 printf '%s\n' "$2" > "$run/experiment/cycles"
 printf '%s\n' "$3" > "$run/experiment/workers"

@@ -18,7 +18,7 @@ candidate-audit directory: audit-tool
 candidate-compare first second:
     bash ops/runtime/compare.sh "$1" "$2"
 
-# Build an isolated Xray probe that logs HTTP/3 queue drops; synthetic lab traffic only.
+# Build an isolated Xray probe that logs HTTP/3 queue drops and QUIC send-size failures; synthetic lab traffic only.
 [group('runtime')]
 masque-probe-build candidate output:
     @bash ops/quality/check.sh static-analysis bash ops/runtime/masque-probe.sh "$1" "$2"

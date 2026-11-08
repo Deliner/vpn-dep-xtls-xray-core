@@ -35,7 +35,7 @@ func Digest(value any) (string, error) {
 }
 
 func JSON(path string, value any) error {
-	raw, err := formattedJSON(value)
+	raw, err := FormattedJSON(value)
 	if err != nil {
 		return err
 	}
@@ -43,14 +43,16 @@ func JSON(path string, value any) error {
 }
 
 func NewJSON(path string, value any) error {
-	raw, err := formattedJSON(value)
+	raw, err := FormattedJSON(value)
 	if err != nil {
 		return err
 	}
 	return Create(path, raw, 0600)
 }
 
-func formattedJSON(value any) ([]byte, error) {
+// FormattedJSON returns the exact encoding used by JSON and NewJSON. Consumers
+// can verify generated configuration bytes without rewriting an existing file.
+func FormattedJSON(value any) ([]byte, error) {
 	raw, err := Encode(value)
 	if err != nil {
 		return nil, err

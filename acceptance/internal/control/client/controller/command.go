@@ -33,7 +33,7 @@ func Command(ctx context.Context, operationName string, output io.Writer) error 
 	if err := write(output, value); err != nil {
 		return err
 	}
-	if operationName == "stop" && value.Error != "" {
+	if operationName != "diagnostics" && value.Error != "" {
 		return errors.New(value.Error)
 	}
 	return nil
@@ -71,6 +71,9 @@ func exchange(ctx context.Context, operationName string) (Diagnostic, error) {
 }
 
 func offline(ctx context.Context, operationName string) (Diagnostic, error) {
+	if operationName == "reconnect" {
+		return Diagnostic{}, fmt.Errorf("reconnect requires an active controller; protection retained")
+	}
 	owner, err := host.Acquire()
 	if err != nil {
 		return Diagnostic{}, err

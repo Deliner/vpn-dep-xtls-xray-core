@@ -35,12 +35,23 @@ cp -R "$module" "$output/dependency"
 cp "$base/source/go.mod" "$output/probe.mod"
 cp "$base/source/go.sum" "$output/probe.sum"
 go -C "$base/source" mod edit -modfile "$output/probe.mod" -replace "github.com/apernet/quic-go=$output/dependency"
-go -C "$root" run ./cmd/masqueprobe "$output/dependency/http3/state_tracking_stream.go" "$output"
+go -C "$root" run ./cmd/masqueprobe "$output/dependency" "$output"
 if ! go -C "$base/source" test -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
   github.com/apernet/quic-go/http3 -run '^TestDatagramReceiving$' -count=1 -v > "$output/control.log" 2>&1; then
   cat "$output/control.log" >&2
   exit 1
 fi
+if ! go -C "$base/source" test -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
+  github.com/apernet/quic-go -run '^(TestSendQueue|TestNHOPSendQueueSizeDrop)' -count=1 -v > "$output/send-control.log" 2>&1; then
+  cat "$output/send-control.log" >&2
+  exit 1
+fi
+for kernel in true false; do
+  grep -Eq "NHOP_QUIC_SEND_SIZE_DROP .*bytes=1300 gso=1300 kernel=$kernel " "$output/send-control.log" || {
+    printf 'Diagnostic control did not observe send-size failure (kernel=%s).\n' "$kernel" >&2
+    exit 1
+  }
+done
 if ! grep -Eq 'NHOP_H3_QUEUE_DROP .*queued=32 bytes=1 prefix=20$' "$output/control.log"; then
   printf 'Diagnostic control did not observe the expected queue drop.\n' >&2
   cat "$output/control.log" >&2
@@ -49,7 +60,7 @@ fi
 mkdir "$output/bin"
 GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 go -C "$base/source" build \
   -trimpath -buildvcs=false -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
-  -ldflags '-s -w -buildid= -X github.com/xtls/xray-core/core.build=nhop-diagnostic-masque-1' \
+  -ldflags '-s -w -buildid= -X github.com/xtls/xray-core/core.build=nhop-diagnostic-masque-2' \
   -o "$output/bin/xray" ./main
 go -C "$base/source" mod verify
 candidate_inventory "$base" > "$output/input.after.sha256"
@@ -57,11 +68,11 @@ cmp "$output/input.before.sha256" "$output/input.after.sha256"
 (cd "$output/dependency"; find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) > "$output/dependency.after.sha256"
 cmp "$output/dependency.before.sha256" "$output/dependency.after.sha256"
 {
-  printf 'kind=diagnostic-only\nprobe_label=nhop-diagnostic-masque-1\nbase_candidate=%s\ntarget=%s\n' "$base" "$target"
+  printf 'kind=diagnostic-only\nprobe_label=nhop-diagnostic-masque-2\nbase_candidate=%s\ntarget=%s\n' "$base" "$target"
   cat "$base/provenance.txt"
   go version -m "$output/bin/xray"
-  shasum -a 256 "$root/ops/runtime/masque-probe.sh" "$root/internal/quality/runtimebuild/queue_probe.go" "$root/internal/quality/runtimebuild/overlay.go"
+  shasum -a 256 "$root/ops/runtime/masque-probe.sh" "$root"/internal/quality/runtimebuild/masqueprobe/*.go
 } > "$output/provenance.txt"
-(cd "$output"; shasum -a 256 bin/xray overlay/* overlay.json probe.json probe.mod probe.sum provenance.txt control.log input.*.sha256 dependency.*.sha256) > "$output/SHA256SUMS"
+(cd "$output"; shasum -a 256 bin/xray overlay/* overlay.json probe.json probe.mod probe.sum provenance.txt control.log send-control.log input.*.sha256 dependency.*.sha256) > "$output/SHA256SUMS"
 printf 'diagnostic-built\n' > "$output/status"
 printf 'Diagnostic only, logs dropped packet prefixes: %s/bin/xray\nUse only with synthetic lab traffic.\n' "$output"

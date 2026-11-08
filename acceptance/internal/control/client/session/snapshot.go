@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -84,4 +85,49 @@ func copyArtifact(directory, name string, artifact Artifact) error {
 		return fmt.Errorf("%s runtime hash mismatch; nothing executed", name)
 	}
 	return safeio.Create(filepath.Join(directory, name), data, 0755)
+}
+
+func verifySnapshot(request Request) error {
+	if err := safeio.CheckAccess(request.Directory, os.ModeDir|0711, os.Geteuid(), os.Getegid()); err != nil {
+		return err
+	}
+	for name, artifact := range map[string]Artifact{"native": request.Native, "frontend": request.Frontend, "libcronet.so": request.Cronet} {
+		path := filepath.Join(request.Directory, name)
+		if err := safeio.CheckAccess(path, 0755, os.Geteuid(), os.Getegid()); err != nil {
+			return err
+		}
+		if digest, err := safeio.FileHash(path); err != nil || digest != artifact.SHA256 {
+			return fmt.Errorf("%s snapshot hash changed; reconnect refused", name)
+		}
+	}
+	tun, err := network.ManualTUN(request.Profile, request.Network)
+	if err != nil {
+		return err
+	}
+	for name, value := range map[string]any{"request.json": request, "native.json": request.Profile.Config, "frontend.json": tun} {
+		mode, gid := os.FileMode(0600), os.Getegid()
+		if name == "native.json" {
+			mode, gid = 0640, request.EngineGID
+		}
+		if err := verifyConfiguration(request.Directory, name, value, mode, gid); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func verifyConfiguration(directory, name string, value any, mode os.FileMode, gid int) error {
+	path := filepath.Join(directory, name)
+	if err := safeio.CheckAccess(path, mode, os.Geteuid(), gid); err != nil {
+		return err
+	}
+	expected, err := safeio.FormattedJSON(value)
+	if err != nil {
+		return err
+	}
+	actual, err := safeio.Read(path, 10_000_000)
+	if err != nil || !bytes.Equal(actual, expected) {
+		return fmt.Errorf("%s snapshot changed; reconnect refused", name)
+	}
+	return nil
 }

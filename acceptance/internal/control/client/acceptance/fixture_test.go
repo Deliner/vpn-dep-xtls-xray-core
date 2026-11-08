@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"vpn-script/internal/control/client/network"
@@ -92,4 +93,21 @@ func origin(t *testing.T, address string) {
 			go func() { defer connection.Close(); io.Copy(connection, connection) }()
 		}
 	}()
+}
+
+func checkIsolation(t *testing.T) {
+	t.Helper()
+	hostname, err := os.Hostname()
+	ci := os.Getenv("GITHUB_ACTIONS") == "true" && os.Getenv("GITHUB_REPOSITORY") == "Deliner/vpn-dep-xtls-xray-core" && os.Getenv("NHOP_CLIENT_CI") == "linux/"+runtime.GOARCH
+	if err != nil || hostname != "lima-payload" && !ci || runtime.GOOS != "linux" || os.Geteuid() != 0 {
+		t.Fatal("session acceptance requires an owned root Linux guest or runner")
+	}
+	for _, namespace := range []string{"net", "mnt"} {
+		self, err := os.Readlink("/proc/self/ns/" + namespace)
+		initial, initialErr := os.Readlink("/proc/1/ns/" + namespace)
+		if err != nil || initialErr != nil || self == initial {
+			t.Fatal("session acceptance requires private namespaces")
+		}
+	}
+	t.Logf("native client acceptance: %s/%s; private mount and network namespaces", runtime.GOOS, runtime.GOARCH)
 }

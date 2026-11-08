@@ -40,10 +40,11 @@ for arch in amd64 arm64; do
     grep -q "native client acceptance: linux/$arch; private mount and network namespaces" "$mode/guest.log"
     grep -q "client policy: IPv6=$policy" "$mode/guest.log"
     ! grep -q 'WARNING: DATA RACE' "$mode/guest.log"
-    for failure in graceful native controller-term controller-kill; do
+    for failure in graceful native controller-term controller-kill reconnect-native reconnect-frontend; do
       expected="--- PASS: TestKernelPublicClientAndControllerRecovery/$failure "
       awk -v expected="$expected" 'index($0, expected) { found=1 } END { exit !found }' "$mode/guest.log"
     done
     for phase in direct tunnel blocked; do grep -q "system DNS $phase:" "$mode/guest.log"; done
+    awk '/reconnect direct UDP: attempts=[0-9]+ delivered=0; same firewall lease retained/ { count++ } END { exit count != 2 }' "$mode/guest.log"
   done
 done

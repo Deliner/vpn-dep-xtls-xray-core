@@ -114,7 +114,7 @@ dependency-format directory +files:
       case "$resolved" in "$directory/"*) ;; *) exit 2 ;; esac
       selected+=("$resolved")
     done
-    gofmt -w "${selected[@]}"
+    bash ops/quality/check.sh formatting gofmt -w "${selected[@]}"
 
 # MUTATES GITHUB: publish a committed maintenance branch without force or default-branch changes.
 [group('dependencies')]

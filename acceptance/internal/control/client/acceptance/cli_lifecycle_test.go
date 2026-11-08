@@ -14,40 +14,6 @@ import (
 	"vpn-script/internal/platform/safeio"
 )
 
-func TestKernelPublicClientAndControllerRecovery(t *testing.T) {
-	if os.Getenv("NHOP_CLIENT_PUBLIC_TEST") != "private-netns" {
-		t.Skip("requires isolated Linux namespaces, private NSS and verified engines")
-	}
-	checkIsolation(t)
-	t.Logf("client policy: IPv6=%s", os.Getenv("NHOP_CLIENT_IPV6"))
-	origin(t, "198.18.0.2:18080")
-	origin(t, "[2001:db8:feed::2]:18080")
-	udpOrigin(t)
-	dns := startDNSOrigins(t)
-	for _, failure := range []string{"graceful", "native", "controller-term", "controller-kill"} {
-		t.Run(failure, func(t *testing.T) { publicLifecycle(t, failure, dns) })
-	}
-}
-
-func publicLifecycle(t *testing.T, failure string, dns *dnsOrigins) {
-	t.Helper()
-	request := fixture(t)
-	probe, initial := newController(t, request)
-	checkSystemDNS(t, probe, dns, "direct")
-	profile, runtimes := cliInputs(t, request)
-	refuseBadRuntime(t, probe, profile, runtimes)
-	command, done, started := cliStart(t, profile, runtimes)
-	if started.Error != "" || started.Status.Phase != "running" {
-		t.Fatalf("public start: %+v", started)
-	}
-	activeTraffic(t, probe)
-	checkSystemDNS(t, probe, dns, "tunnel")
-	verifyIdentity(t, started)
-	refuseDuplicate(t, profile, runtimes, started)
-	failPublic(t, probe, command, done, started, failure)
-	finishPublic(t, probe, initial, done, failure, dns)
-}
-
 func failPublic(t *testing.T, probe *controller, command *exec.Cmd, done <-chan error, started clientcontrol.Diagnostic, failure string) {
 	t.Helper()
 	if failure == "native" {

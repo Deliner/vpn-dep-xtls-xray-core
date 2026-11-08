@@ -2,7 +2,6 @@ package acceptance
 
 import (
 	"os"
-	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -64,19 +63,40 @@ func failEngine(t *testing.T, c *controller, failure string, started response) {
 	checkTraffic(t, c, false)
 }
 
-func checkIsolation(t *testing.T) {
+func TestKernelPublicClientAndControllerRecovery(t *testing.T) {
+	if os.Getenv("NHOP_CLIENT_PUBLIC_TEST") != "private-netns" {
+		t.Skip("requires isolated Linux namespaces, private NSS and verified engines")
+	}
+	checkIsolation(t)
+	t.Logf("client policy: IPv6=%s", os.Getenv("NHOP_CLIENT_IPV6"))
+	origin(t, "198.18.0.2:18080")
+	origin(t, "[2001:db8:feed::2]:18080")
+	udpOrigin(t)
+	dns := startDNSOrigins(t)
+	for _, failure := range []string{"graceful", "native", "controller-term", "controller-kill", "reconnect-native", "reconnect-frontend"} {
+		t.Run(failure, func(t *testing.T) { publicLifecycle(t, failure, dns) })
+	}
+}
+
+func publicLifecycle(t *testing.T, failure string, dns *dnsOrigins) {
 	t.Helper()
-	hostname, err := os.Hostname()
-	ci := os.Getenv("GITHUB_ACTIONS") == "true" && os.Getenv("GITHUB_REPOSITORY") == "Deliner/vpn-dep-xtls-xray-core" && os.Getenv("NHOP_CLIENT_CI") == "linux/"+runtime.GOARCH
-	if err != nil || hostname != "lima-payload" && !ci || runtime.GOOS != "linux" || os.Geteuid() != 0 {
-		t.Fatal("session acceptance requires an owned root Linux guest or runner")
+	request := fixture(t)
+	probe, initial := newController(t, request)
+	checkSystemDNS(t, probe, dns, "direct")
+	profile, runtimes := cliInputs(t, request)
+	refuseBadRuntime(t, probe, profile, runtimes)
+	command, done, started := cliStart(t, profile, runtimes)
+	if started.Error != "" || started.Status.Phase != "running" {
+		t.Fatalf("public start: %+v", started)
 	}
-	for _, namespace := range []string{"net", "mnt"} {
-		self, err := os.Readlink("/proc/self/ns/" + namespace)
-		initial, initialErr := os.Readlink("/proc/1/ns/" + namespace)
-		if err != nil || initialErr != nil || self == initial {
-			t.Fatal("session acceptance requires private namespaces")
-		}
+	activeTraffic(t, probe)
+	checkSystemDNS(t, probe, dns, "tunnel")
+	verifyIdentity(t, started)
+	refuseDuplicate(t, profile, runtimes, started)
+	if strings.HasPrefix(failure, "reconnect-") {
+		reconnectPublic(t, probe, initial, done, started, strings.TrimPrefix(failure, "reconnect-"), dns)
+		return
 	}
-	t.Logf("native client acceptance: %s/%s; private mount and network namespaces", runtime.GOOS, runtime.GOARCH)
+	failPublic(t, probe, command, done, started, failure)
+	finishPublic(t, probe, initial, done, failure, dns)
 }
