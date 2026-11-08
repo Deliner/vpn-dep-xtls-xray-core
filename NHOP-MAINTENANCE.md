@@ -34,3 +34,12 @@ proxy queues remain finite, and DATAGRAM transport is unreliable. This patch doe
 not claim to fix MTU reductions, all loss under latency/load, or the original rare
 all-protocol MASQUE failure. The profile remains experimental until those open
 observations have their own reproducible regression and verified correction.
+
+A separate `TestNHOPRemoteTCPReordering` connects two real remote TCP stacks
+through an in-memory IPv4 link (MTU 1280), without QUIC or HTTP/3. Three batches
+of eight 32 KiB echoes use a constant 20 ms scheduling delay; three more use
+15..25 ms delays. Timer delivery can reorder even the constant-delay case.
+The test measures actual within-flow reorder events and requires observations
+in every jitter batch. All 48 exchanges completed within their original two-second
+budgets with the race detector on Darwin ARM64. This passing isolation control
+does not reproduce or fix the separate Linux MASQUE delay failure.
