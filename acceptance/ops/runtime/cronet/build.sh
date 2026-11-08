@@ -6,6 +6,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
 recipe="$root/ops/runtime/cronet"
 source "$recipe/prepare.sh"
 source "$recipe/toolchain.sh"
+source "$recipe/inspection.sh"
 target="${1:-}"
 output="${2:-}"
 [[ "$(go env GOVERSION)" == go1.27.3 ]] || exit 2
@@ -49,11 +50,7 @@ go -C "$work/source" run ./cmd/build-naive build --target "$target" > "$work/bui
 native_output="$src/out/cronet-$native_os-$native_cpu"
 cp "$native_output/obj/components/cronet/libcronet_static.a" "$work/bin/libcronet.a"
 if [[ "$native_os" == linux ]]; then cp "$native_output/libcronet.so" "$work/bin/libcronet.so"; fi
-mkdir "$work/inspection"
-cp "$native_output/args.gn" "$work/inspection/args.gn"
-cp "$src/components/cronet/native/include/cronet_c.h" "$work/inspection/cronet_c.h"
-(cd "$src" && "$src/gn/out/gn" desc "$native_output" //components/cronet:cronet deps --all) > "$work/inspection/dependencies.txt"
-(cd "$src" && "$work/tools/ninja-real" -C "$native_output" -t commands cronet) > "$work/inspection/commands.txt"
-(cd "$work" && shasum -a 256 bin/* provenance.txt build.log > SHA256SUMS)
+native_inspect
+(cd "$work" && shasum -a 256 bin/* provenance.txt build.log inspection/* > SHA256SUMS)
 printf 'native-built\n' > "$work/status"
 printf 'Native candidate built; ABI and payload acceptance still required: %s\n' "$work"

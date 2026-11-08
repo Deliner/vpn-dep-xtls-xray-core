@@ -13,7 +13,7 @@ native_prepare_tools() {
   chmod 0755 "$src/gn/out/gn" "$work/tools/ninja-real"
   printf 'llvmorg-24-init-3796-g20e97c4b-27\n' > "$clang_directory/cr_build_revision"
   printf 'git_revision:150a9d6ba0aa7f407aa4feeabc5f03ce9aa7e04b\n' > "$src/gn/out/cr_build_revision"
-  printf '#!/usr/bin/env bash\nexec %q -j4 "$@"\n' "$work/tools/ninja-real" > "$work/tools/ninja"
+  printf '#!/usr/bin/env bash\nexec %q -j4 -d keeprsp "$@"\n' "$work/tools/ninja-real" > "$work/tools/ninja"
   printf '#!/usr/bin/env bash\nprintf "Unplanned native input download refused\\n" >&2\nexit 2\n' > "$work/tools/curl"
   chmod 0755 "$work/tools/ninja" "$work/tools/curl"
 }
