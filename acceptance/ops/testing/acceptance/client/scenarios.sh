@@ -4,6 +4,7 @@ client_scenario() {
   local kind="$1" policy="$2" mode result=0 file
   mode="$report/$policy"
   if [[ "$kind" == systemd ]]; then mode="$report/service/$policy"; fi
+  if [[ "$kind" == protocols ]]; then mode="$report/protocols/$policy"; fi
   mkdir -m 0700 "$mode" "$mode/bin"
   cp "$report/network.test" "$mode/network.test"
   cp ops/testing/client/kernel-guest.sh "$mode/guest.sh"
@@ -12,6 +13,8 @@ client_scenario() {
   cp "build/runtime-candidates/client-sing-box-linux-$arch/bin/"* "$mode/bin/"
   if [[ "$kind" == systemd ]]; then
     cp ops/testing/client/systemd-guest.sh "$mode/systemd-guest.sh"
+  fi
+  if [[ "$kind" != public ]]; then
     cp "$report/nhop-client" "$mode/bin/nhop-client"
   fi
   (cd "$mode"; sha256sum network.test guest.sh *-guest.sh bin/*) > "$mode/inputs.sha256"

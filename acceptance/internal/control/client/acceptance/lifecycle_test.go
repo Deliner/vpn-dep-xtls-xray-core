@@ -1,10 +1,13 @@
 package acceptance
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"syscall"
 	"testing"
+
+	"vpn-script/internal/core/dag"
 )
 
 func TestKernelSessionStartStopAndFailures(t *testing.T) {
@@ -17,6 +20,61 @@ func TestKernelSessionStartStopAndFailures(t *testing.T) {
 	udpOrigin(t)
 	for _, failure := range []string{"graceful", "native", "frontend"} {
 		t.Run(failure, func(t *testing.T) { lifecycle(t, failure) })
+	}
+}
+
+func TestKernelAllProtocolTUN(t *testing.T) {
+	if os.Getenv("NHOP_CLIENT_PROTOCOL_TEST") != "private-netns" || os.Getenv("NHOP_CLIENT_BINARY") == "" {
+		t.Skip("requires isolated Linux namespaces and the real public CLI binary")
+	}
+	checkIsolation(t)
+	t.Logf("TUN matrix policy: IPv6=%s; real CLI import/start/reconnect/stop", os.Getenv("NHOP_CLIENT_IPV6"))
+	origin(t, "198.18.0.2:18080")
+	origin(t, "[2001:db8:feed::2]:18080")
+	udpOrigin(t)
+	dns := startDNSOrigins(t)
+	for _, hops := range []int{1, 3} {
+		t.Run(fmt.Sprintf("%d-hop", hops), func(t *testing.T) {
+			fixture := protocolLab(t, hops)
+			for _, name := range dag.Keys(fixture.topology.Routes) {
+				t.Run(name, func(t *testing.T) { protocolLifecycle(t, fixture, name, dns) })
+			}
+		})
+	}
+}
+
+func protocolLifecycle(t *testing.T, fixture *protocolFixture, name string, dns *dnsOrigins) {
+	t.Helper()
+	request := fixture.request(t, name)
+	probe, initial := newController(t, request)
+	checkSystemDNS(t, probe, dns, "direct")
+	profile, runtimes := cliInputs(t, request)
+	_, done, started := cliStart(t, profile, runtimes)
+	if started.Error != "" || started.Status.Phase != "running" {
+		t.Fatalf("protocol start: %+v", started)
+	}
+	activeTraffic(t, probe)
+	checkUDP6(t, probe, os.Getenv("NHOP_CLIENT_IPV6") == "tunnel")
+	checkSystemDNS(t, probe, dns, "tunnel")
+	canary, watch := directCanary(t), startLeakWatch(t)
+	if started.Status.NativePID <= 1 || syscall.Kill(started.Status.NativePID, syscall.SIGKILL) != nil {
+		t.Fatal("cannot stop native protocol engine")
+	}
+	waitFailure(t)
+	checkTraffic(t, probe, false)
+	checkUDP6(t, probe, false)
+	checkSystemDNS(t, probe, dns, "blocked")
+	reconnectAndVerify(t, probe, started, dns)
+	checkUDP6(t, probe, os.Getenv("NHOP_CLIENT_IPV6") == "tunnel")
+	watch.stop(t)
+	if watch.attempts < 20 || canary.Load() != 0 {
+		t.Fatalf("protocol direct leak control: attempts=%d delivered=%d", watch.attempts, canary.Load())
+	}
+	t.Logf("TUN protocol=%s hops=%d IPv6=%s direct UDP: attempts=%d delivered=0; same firewall lease retained",
+		name, request.Profile.Metadata.HopCount, os.Getenv("NHOP_CLIENT_IPV6"), watch.attempts)
+	finishPublic(t, probe, initial, done, "graceful", dns)
+	if result := probe.call(t, "probe-direct"); result.Error != "" || canary.Load() == 0 {
+		t.Fatalf("protocol direct canary not reachable after explicit stop: %+v", result)
 	}
 }
 

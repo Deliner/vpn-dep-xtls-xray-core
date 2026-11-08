@@ -14,6 +14,7 @@ case "${1:-policy}" in
   session) pattern='^TestKernelSessionStartStopAndFailures$' ;;
   public) pattern='^TestKernelPublicClientAndControllerRecovery$' ;;
   systemd) pattern='^TestKernelSystemdManagedRecovery$' ;;
+  protocols) pattern='^TestKernelAllProtocolTUN$' ;;
   *) exit 2 ;;
 esac
 case "${2:-tunnel}" in tunnel|block) export NHOP_CLIENT_IPV6="${2:-tunnel}" ;; *) exit 2 ;; esac
@@ -51,6 +52,8 @@ ip netns exec nhop-client-inner ip -6 address add 2001:db8:ffff::2/64 dev client
 ip netns exec nhop-client-inner ip link set client up
 ip netns exec nhop-client-inner ip route add default via 198.51.100.7
 ip netns exec nhop-client-inner ip -6 route add default via 2001:db8:ffff::1
+ip address add 198.51.100.9/32 dev lo
+ip address add 198.51.100.11/32 dev lo
 ip address add 198.18.0.2/32 dev lo
 ip -6 address add 2001:db8:feed::2/128 dev lo nodad
 if [[ "${1:-}" == resolver ]]; then
@@ -62,12 +65,12 @@ if [[ "${1:-}" == resolver ]]; then
   ip link set nhopdns up
   export NHOP_CLIENT_RESOLVED_TEST=private-netns
 fi
-if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == systemd ]]; then
+if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == protocols ]]; then
   if [[ "${1:-}" == systemd ]]; then source ./systemd-guest.sh; fi
   source ./resolved-guest.sh
   client_private_resolved "$1"
 fi
-if [[ "${1:-}" == public || "${1:-}" == systemd ]]; then
+if [[ "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == protocols ]]; then
   ip netns exec nhop-client-inner resolvectl dns client 198.51.100.7
   ip netns exec nhop-client-inner resolvectl default-route client yes
   ip netns exec nhop-client-inner resolvectl dnsovertls client no
@@ -84,7 +87,12 @@ fi
 if [[ "${1:-}" == systemd ]]; then
   client_systemd_prepare
 fi
+test_timeout=2m
+if [[ "${1:-}" == protocols ]]; then
+  export NHOP_CLIENT_PROTOCOL_TEST=private-netns NHOP_CLIENT_BINARY="$PWD/bin/nhop-client"
+  test_timeout=10m
+fi
 NHOP_CLIENT_KERNEL_TEST=private-netns NHOP_CLIENT_RUNTIME="$PWD/bin" ./network.test \
-  -test.run "$pattern" -test.v -test.timeout=2m
-case "${1:-}" in resolver|session|public|systemd) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
-if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == systemd ]]; then cat bus.log resolved.log; fi
+  -test.run "$pattern" -test.v -test.timeout="$test_timeout"
+case "${1:-}" in resolver|session|public|systemd|protocols) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
+if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == protocols ]]; then cat bus.log resolved.log; fi

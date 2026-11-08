@@ -16,7 +16,14 @@ import (
 
 func udpOrigin(t *testing.T) {
 	t.Helper()
-	listener, err := net.ListenPacket("udp", "198.18.0.2:18081")
+	for _, address := range []string{"198.18.0.2:18081", "[2001:db8:feed::2]:18081"} {
+		udpEcho(t, address)
+	}
+}
+
+func udpEcho(t *testing.T, address string) {
+	t.Helper()
+	listener, err := net.ListenPacket("udp", address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,6 +38,14 @@ func udpOrigin(t *testing.T) {
 			_, _ = listener.WriteTo(buffer[:n], address)
 		}
 	}()
+}
+
+func checkUDP6(t *testing.T, probe *controller, allowed bool) {
+	t.Helper()
+	result := probe.call(t, "probe-udp6")
+	if (result.Error == "") != allowed {
+		t.Fatalf("IPv6 UDP allowed=%v: %s", allowed, result.Error)
+	}
 }
 
 func checkTraffic(t *testing.T, c *controller, allowed bool) {

@@ -40,7 +40,7 @@ acceptance-cronet-verify arch candidate:
 acceptance-cronet-payload arch candidate output:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet-payload.sh "$1" "$2" "$3"
 
-# Verify native Linux foreground/systemd clients with race instrumentation, system DNS and crash recovery.
+# Verify native Linux all-protocol TUN and foreground/systemd recovery with race instrumentation.
 [group('acceptance')]
 acceptance-client-run arch:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/client/run.sh "$1"

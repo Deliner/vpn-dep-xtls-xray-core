@@ -41,6 +41,9 @@ func cliContext(t *testing.T, ctx context.Context, args ...string) *exec.Cmd {
 		t.Fatal(err)
 	}
 	arguments := []string{"ip", "netns", "exec", "nhop-client-inner", executable, "-test.run=^TestPublicClientHelper$", "--"}
+	if binary := os.Getenv("NHOP_CLIENT_BINARY"); binary != "" {
+		arguments = []string{"ip", "netns", "exec", "nhop-client-inner", binary}
+	}
 	command := process.Command(ctx, arguments[0], append(arguments[1:], args...)...)
 	command.Env = append(os.Environ(), "NHOP_PUBLIC_CLIENT_HELPER=1")
 	command.Stderr = os.Stderr

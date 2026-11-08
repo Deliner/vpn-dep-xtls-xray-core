@@ -17,7 +17,10 @@ func Inbound(name string, service model.Service, secret model.Secret) model.Obje
 		value["settings"] = model.Object{"clients": []model.Object{{"password": secret.Password}}}
 	case strings.HasPrefix(service.Protocol, "masque"):
 		value["protocol"] = "masque"
-		value["settings"] = model.Object{"users": []model.Object{{"email": "vpn", "pass": secret.Password}}, "address": []string{"10.234.0.1/24"}, "mtu": 1280}
+		// CONNECT-IP assigns an inner address per destination family, independent
+		// of the public listener's family. Both pools belong to this private stack.
+		value["settings"] = model.Object{"users": []model.Object{{"email": "vpn", "pass": secret.Password}},
+			"address": []string{"10.234.0.1/24", "fd42:6e68:6f70::1/64"}, "mtu": 1280}
 	default:
 		value["protocol"], value["settings"] = userProtocol(service), userInbound(service, secret)
 	}

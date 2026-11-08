@@ -77,3 +77,8 @@ client-public-test xray singbox ipv6='tunnel':
 [group('client')]
 client-service-test xray singbox ipv6='tunnel':
     @bash ops/quality/check.sh static-analysis bash ops/testing/client/systemd.sh "$1" "$2" "$3"
+
+# Verify every generated protocol through the real Linux CLI/TUN over single and mixed three-hop routes in the owned VM.
+[group('client')]
+client-protocol-test xray singbox ipv6='tunnel':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/protocols.sh "$1" "$2" "$3"

@@ -44,14 +44,15 @@ client_verify_systemd() {
 }
 
 client_verify_dns() {
-  awk '/system DNS (direct|tunnel|blocked):/ {
+  awk -v direct_count="${2:-2}" -v tunnel_count="${3:-6}" -v blocked_count="${4:-1}" -v contiguous="${5:-1}" '/system DNS (direct|tunnel|blocked):/ {
     value=$0; sub(/^.*system DNS /,"",value); split(value,fields,/[: =]+/)
     kind=fields[1]; split(fields[3],direct,"->"); split(fields[5],https,"->")
     if (fields[3] !~ /^[0-9]+->[0-9]+$/ || fields[5] !~ /^[0-9]+->[0-9]+$/) bad=1
-    if (seen && (direct[1]+0 != previous_direct || https[1]+0 != previous_https)) bad=1
+    if (contiguous && seen && (direct[1]+0 != previous_direct || https[1]+0 != previous_https)) bad=1
+    if (seen && (direct[1]+0 < previous_direct || https[1]+0 < previous_https)) bad=1
     if (kind=="direct" && !(direct[2]+0 > direct[1]+0 && https[1]==https[2])) bad=1
     if (kind=="tunnel" && !(https[2]+0 > https[1]+0 && direct[1]==direct[2])) bad=1
     if (kind=="blocked" && !(direct[1]==direct[2] && https[1]==https[2])) bad=1
     seen=1; previous_direct=direct[2]+0; previous_https=https[2]+0; counts[kind]++
-  } END { exit bad || counts["direct"] != 2 || counts["tunnel"] != 6 || counts["blocked"] != 1 }' "$1" || return 1
+  } END { exit bad || counts["direct"] != direct_count || counts["tunnel"] != tunnel_count || counts["blocked"] != blocked_count }' "$1" || return 1
 }

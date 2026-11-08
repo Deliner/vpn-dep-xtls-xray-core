@@ -22,16 +22,8 @@ import (
 
 func fixture(t *testing.T) session.Request {
 	t.Helper()
-	directory := t.TempDir()
-	for _, path := range []string{filepath.Dir(directory), directory} {
-		if err := os.Chmod(path, 0711); err != nil {
-			t.Fatal(err)
-		}
-	}
-	request := session.Request{Directory: filepath.Join(directory, "active"), Network: network.Defaults(20000), EngineGID: 20000}
-	request.Native = artifact(t, "xray")
-	request.Frontend = artifact(t, "sing-box")
-	request.Cronet = artifact(t, "libcronet.so")
+	request := runtimeRequest(t)
+	directory := filepath.Dir(request.Directory)
 	password := "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY="
 	config := xray.Client(model.Object{"protocol": "shadowsocks", "tag": "proxy", "settings": model.Object{"servers": []model.Object{{
 		"address": "198.51.100.7", "port": 24443, "method": model.SSMethod, "password": password}}}}, 12080)
@@ -48,6 +40,21 @@ func fixture(t *testing.T) session.Request {
 	value.Metadata.ConfigSHA256, _ = safeio.Digest(value.Config)
 	request.Profile = value
 	startExit(t, directory, password, request.Native.Path)
+	return request
+}
+
+func runtimeRequest(t *testing.T) session.Request {
+	t.Helper()
+	directory := t.TempDir()
+	for _, path := range []string{filepath.Dir(directory), directory} {
+		if err := os.Chmod(path, 0711); err != nil {
+			t.Fatal(err)
+		}
+	}
+	request := session.Request{Directory: filepath.Join(directory, "active"), Network: network.Defaults(20000), EngineGID: 20000}
+	request.Native = artifact(t, "xray")
+	request.Frontend = artifact(t, "sing-box")
+	request.Cronet = artifact(t, "libcronet.so")
 	return request
 }
 
