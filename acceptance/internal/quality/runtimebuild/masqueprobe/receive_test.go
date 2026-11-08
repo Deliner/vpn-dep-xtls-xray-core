@@ -68,7 +68,7 @@ func TestProbeRejectsUnreviewedSourceWithoutReplacingFiles(t *testing.T) {
 	if err := os.WriteFile(source, []byte(queueFixture), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := Overlay(directory, directory); err == nil {
+	if err := Overlay(directory, directory, directory); err == nil {
 		t.Fatal("probe accepted a changed dependency source")
 	}
 	actual, err := os.ReadFile(source)

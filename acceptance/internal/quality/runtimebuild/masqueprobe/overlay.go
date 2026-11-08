@@ -10,9 +10,9 @@ import (
 	"vpn-script/internal/platform/safeio"
 )
 
-// Overlay observes receive-queue refusal and send-size errors without changing
-// admission, error handling or packet sizes. Every source is reviewed before writes.
-func Overlay(dependency, output string) error {
+// Overlay observes queues and inner TCP headers without changing admission,
+// error handling or packet sizes. Every source is reviewed before writes.
+func Overlay(dependency, source, output string) error {
 	dependency, err := filepath.Abs(dependency)
 	if err != nil {
 		return err
@@ -21,6 +21,16 @@ func Overlay(dependency, output string) error {
 	if err != nil {
 		return err
 	}
+	packets, err := inspectPackets(source)
+	if err != nil {
+		return err
+	}
+	changes = append(changes, packets...)
+	device, err := inspectDevice(source)
+	if err != nil {
+		return err
+	}
+	changes = append(changes, device...)
 	return publishOverlay(output, changes, policy)
 }
 
@@ -46,7 +56,7 @@ func publishOverlay(output string, changes []sourceChange, policy string) error 
 		return err
 	}
 	return safeio.JSON(filepath.Join(output, "probe.json"), map[string]any{
-		"schema_version": 2, "kind": "diagnostic-only", "queue_policy": policy,
+		"schema_version": 4, "kind": "diagnostic-only", "queue_policy": policy,
 		"default_queue_limit": 32, "sources": observations,
 	})
 }

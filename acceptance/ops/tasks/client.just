@@ -73,6 +73,36 @@ client-boot-test xray singbox ipv6='tunnel':
 client-boot-order-test:
     @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/order.sh
 
+# Prepare separate client/exit VMs for real boot acceptance using the pinned local lab tool and image.
+[group('client')]
+client-reboot-lab-setup:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/reboot/setup.sh
+
+# Start only the two checkout-owned client reboot VMs; leaves Mac networking unchanged.
+[group('client')]
+client-reboot-lab-start:
+    bash ops/testing/client/install/reboot/vm.sh start
+
+# Show both client reboot VM states without starting them.
+[group('client')]
+client-reboot-lab-status:
+    bash ops/testing/client/install/reboot/vm.sh status
+
+# Stop only the two checkout-owned client reboot VMs, retaining disks and evidence.
+[group('client')]
+client-reboot-lab-stop:
+    bash ops/testing/client/install/reboot/vm.sh stop
+
+# Execute a command only in boot-client or boot-exit using private SSH metadata.
+[group('client')]
+client-reboot-lab-shell node +args:
+    bash ops/testing/client/install/reboot/vm.sh shell "$@"
+
+# Reboot the owned Linux client VM with a separate exit, early leak probe and local recovery timer.
+[group('client')]
+client-reboot-test xray singbox:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/reboot/run.sh "$1" "$2"
+
 # Show credential-free local session status; unavailable controllers are explicitly labelled.
 [group('client')]
 client-diagnostics:
