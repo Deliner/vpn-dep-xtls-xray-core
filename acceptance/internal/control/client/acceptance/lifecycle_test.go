@@ -73,7 +73,7 @@ func TestKernelPublicClientAndControllerRecovery(t *testing.T) {
 	origin(t, "[2001:db8:feed::2]:18080")
 	udpOrigin(t)
 	dns := startDNSOrigins(t)
-	for _, failure := range []string{"graceful", "native", "controller-term", "controller-kill", "reconnect-native", "reconnect-frontend"} {
+	for _, failure := range []string{"graceful", "native", "controller-term", "controller-kill", "reconnect-native", "reconnect-frontend", "resume-term", "resume-kill"} {
 		t.Run(failure, func(t *testing.T) { publicLifecycle(t, failure, dns) })
 	}
 }
@@ -95,6 +95,15 @@ func publicLifecycle(t *testing.T, failure string, dns *dnsOrigins) {
 	refuseDuplicate(t, profile, runtimes, started)
 	if strings.HasPrefix(failure, "reconnect-") {
 		reconnectPublic(t, probe, initial, done, started, strings.TrimPrefix(failure, "reconnect-"), dns)
+		return
+	}
+	if strings.HasPrefix(failure, "resume-") {
+		for _, path := range []string{profile, runtimes} {
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+		}
+		resumePublic(t, probe, initial, command, done, started, strings.TrimPrefix(failure, "resume-"), dns)
 		return
 	}
 	failPublic(t, probe, command, done, started, failure)

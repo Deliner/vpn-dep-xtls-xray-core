@@ -23,6 +23,11 @@ client-diagnostics:
 client-reconnect:
     ./build/bin/nhop-client reconnect
 
+# MUTATES LINUX CLIENT NETWORK: resume the protected journal in foreground after controller death.
+[group('client')]
+client-resume:
+    ./build/bin/nhop-client resume
+
 # MUTATES LINUX CLIENT NETWORK: explicitly stop or recover the owned session and restore ordinary networking.
 [group('client')]
 client-stop:

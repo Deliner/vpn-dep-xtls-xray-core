@@ -91,12 +91,9 @@ func offline(ctx context.Context, operationName string) (Diagnostic, error) {
 	if err := host.Commands(); err != nil {
 		return value, err
 	}
-	var recorded session.Request
-	if err := host.ReadSession(directory, "request.json", &recorded); err != nil {
+	recorded, err := loadRecorded(directory)
+	if err != nil {
 		return value, err
-	}
-	if recorded.Directory != directory {
-		return value, fmt.Errorf("session request does not belong to current journal directory")
 	}
 	return recoverSession(ctx, recorded, status)
 }

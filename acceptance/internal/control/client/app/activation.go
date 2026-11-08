@@ -16,5 +16,8 @@ func control(command string, value options, output io.Writer) error {
 	if command == "start" {
 		return controller.Start(ctx, controller.Options{Profile: value.profile, Runtimes: value.runtimes, Network: value.network}, output)
 	}
+	if command == "resume" {
+		return controller.Resume(ctx, output)
+	}
 	return controller.Command(ctx, command, output)
 }

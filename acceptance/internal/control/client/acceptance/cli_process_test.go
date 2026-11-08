@@ -31,13 +31,17 @@ func TestPublicClientHelper(t *testing.T) {
 }
 
 func cliCommand(t *testing.T, args ...string) *exec.Cmd {
+	return cliContext(t, context.Background(), args...)
+}
+
+func cliContext(t *testing.T, ctx context.Context, args ...string) *exec.Cmd {
 	t.Helper()
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
 	arguments := []string{"ip", "netns", "exec", "nhop-client-inner", executable, "-test.run=^TestPublicClientHelper$", "--"}
-	command := process.Command(context.Background(), arguments[0], append(arguments[1:], args...)...)
+	command := process.Command(ctx, arguments[0], append(arguments[1:], args...)...)
 	command.Env = append(os.Environ(), "NHOP_PUBLIC_CLIENT_HELPER=1")
 	command.Stderr = os.Stderr
 	return command
@@ -59,8 +63,13 @@ func cliCall(t *testing.T, operation string) clientcontrol.Diagnostic {
 
 func cliStart(t *testing.T, profile, runtimes string) (*exec.Cmd, <-chan error, clientcontrol.Diagnostic) {
 	t.Helper()
-	command := cliCommand(t, "start", "--profile", profile, "--runtimes", runtimes, "--ipv6", os.Getenv("NHOP_CLIENT_IPV6"),
+	return cliForeground(t, "start", "--profile", profile, "--runtimes", runtimes, "--ipv6", os.Getenv("NHOP_CLIENT_IPV6"),
 		"--dns-ip", "198.18.0.2", "--dns-name", "dns.example.invalid")
+}
+
+func cliForeground(t *testing.T, args ...string) (*exec.Cmd, <-chan error, clientcontrol.Diagnostic) {
+	t.Helper()
+	command := cliCommand(t, args...)
 	output, err := command.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -85,6 +94,16 @@ func cliStart(t *testing.T, profile, runtimes string) (*exec.Cmd, <-chan error, 
 		sessionLogs(t, value.Directory)
 	})
 	return command, done, value
+}
+
+func cliRejects(t *testing.T, args ...string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	data, err := cliContext(t, ctx, args...).Output()
+	if err == nil || ctx.Err() != nil {
+		t.Fatalf("command did not refuse promptly: %v, %v, %s", args, err, data)
+	}
 }
 
 func cliWait(t *testing.T, done <-chan error, success bool) {

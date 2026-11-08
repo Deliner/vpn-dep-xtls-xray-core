@@ -61,8 +61,8 @@ func refuseChangedLease(t *testing.T, probe *controller, directory string) {
 		t.Fatal(err)
 	}
 	before := probe.call(t, "routes").Routes
-	if data, err := cliCommand(t, "stop").Output(); err == nil {
-		t.Fatalf("recovery accepted an unmatched firewall lease: %s", data)
+	for _, command := range []string{"stop", "resume"} {
+		cliRejects(t, command)
 	}
 	if probe.call(t, "routes").Routes != before {
 		t.Fatal("rejected recovery mutated routing rules")

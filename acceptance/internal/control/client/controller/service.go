@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"time"
 
@@ -46,8 +45,12 @@ func serve(ctx context.Context, owner *host.Owner, value session.Request, output
 	if active == nil {
 		return errors.Join(err, owner.ForgetUnstarted())
 	}
+	return supervise(ctx, control, active, value, output, err)
+}
+
+func supervise(ctx context.Context, control *socket, active *session.Session, value session.Request, output io.Writer, startErr error) (result error) {
 	defer func() { result = errors.Join(result, active.Abort()) }()
-	initial := diagnostic(active, value.Directory, err)
+	initial := diagnostic(active, value.Directory, startErr)
 	if err := write(output, initial); err != nil {
 		return err
 	}
@@ -100,12 +103,8 @@ func controlSession(ctx context.Context, active *session.Session, state Diagnost
 }
 
 func reconnect(ctx context.Context, active *session.Session, request session.Request) error {
-	identity, err := host.ExistingIdentity(ctx)
-	if err != nil {
+	if err := validateIdentity(ctx, request); err != nil {
 		return err
-	}
-	if identity.UID != request.Network.EngineUID || identity.GID != request.EngineGID {
-		return fmt.Errorf("client NSS identity changed; reconnect refused with protection retained")
 	}
 	return active.Reconnect(ctx)
 }

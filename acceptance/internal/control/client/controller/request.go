@@ -69,3 +69,25 @@ func recorded(owner *host.Owner) (string, session.Status, error) {
 	err = host.ReadSession(directory, "status.json", &status)
 	return directory, status, err
 }
+
+func loadRecorded(directory string) (session.Request, error) {
+	var value session.Request
+	if err := host.ReadSession(directory, "request.json", &value); err != nil {
+		return value, err
+	}
+	if value.Directory != directory {
+		return value, fmt.Errorf("session request does not belong to current journal directory")
+	}
+	return value, nil
+}
+
+func validateIdentity(ctx context.Context, request session.Request) error {
+	identity, err := host.ExistingIdentity(ctx)
+	if err != nil {
+		return err
+	}
+	if identity.UID != request.Network.EngineUID || identity.GID != request.EngineGID {
+		return fmt.Errorf("client NSS identity changed; recovery refused with protection retained")
+	}
+	return nil
+}
