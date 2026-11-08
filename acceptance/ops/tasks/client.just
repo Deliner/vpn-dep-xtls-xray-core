@@ -13,6 +13,26 @@ client-plan profile output engine_uid ipv6='tunnel':
 client-service-plan binary profile runtimes output ipv6='tunnel':
     go run ./cmd/nhop-client service-plan --binary "$1" --profile "$2" --runtimes "$3" --output "$4" --ipv6 "$5"
 
+# MUTATES LINUX FILES: install a verified private client generation and inactive manual-start unit; never enables boot.
+[group('client')]
+client-service-install profile runtimes ipv6='tunnel':
+    ./build/bin/nhop-client service-install --profile "$1" --runtimes "$2" --ipv6 "$3"
+
+# MUTATES LINUX FILES: unregister the verified inactive unit, retaining snapshots and recovery state.
+[group('client')]
+client-service-remove:
+    ./build/bin/nhop-client service-remove
+
+# Verify actual CLI installation/update/interruption/rollback/unregister with systemd only in the owned Linux VM.
+[group('client')]
+client-install-test xray singbox:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/run.sh "$1" "$2"
+
+# Run the actually installed Linux service through private TUN/DNS, process failures and guarded recovery in the owned VM.
+[group('client')]
+client-installed-test xray singbox ipv6='tunnel':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/managed.sh "$1" "$2" "$3"
+
 # MUTATES LINUX CLIENT NETWORK: stay in foreground with root-only control and fail-closed cancellation.
 [group('client')]
 client-start profile runtimes ipv6='tunnel':

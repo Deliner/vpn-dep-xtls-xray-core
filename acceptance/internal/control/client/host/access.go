@@ -23,6 +23,22 @@ func protectedParents(path string, owner int) error {
 
 func protectedFile(path string, owner int) error { return protected(path, owner, false) }
 
+// ProtectedDirectory verifies the entire root-owned path without changing it.
+func ProtectedDirectory(path string) error { return protectedParents(path, 0) }
+
+// ProtectedExecutable permits resolving a system-provided tool symlink only
+// before checking the resulting root-owned executable and every parent.
+func ProtectedExecutable(path string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	if err := protectedParents(filepath.Dir(resolved), 0); err != nil {
+		return "", err
+	}
+	return resolved, protectedFile(resolved, 0)
+}
+
 // PrivateInput prevents an unattended service from trusting writable parents or
 // non-private credentials. Existing permissions are inspected, never repaired.
 func PrivateInput(path string) error {

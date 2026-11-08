@@ -74,9 +74,12 @@ go() {
   return 2
 }
 lab_shell() {
-  if [[ "$1" == mkdir ]]; then return; fi
-  printf 'synthetic guest failure\n'
-  return 17
+  case "$1" in
+    mkdir) return 0 ;;
+    test) return 1 ;; # The failed guest produced no baseline artifacts.
+    flock) printf 'synthetic guest failure\n'; return 17 ;;
+    *) return 2 ;;
+  esac
 }
 client_lab_begin
 client_lab_run resolver

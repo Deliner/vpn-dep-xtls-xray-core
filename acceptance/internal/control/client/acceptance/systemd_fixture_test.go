@@ -23,6 +23,20 @@ type managedService struct {
 	unit                              []byte
 }
 
+func managedContext(t *testing.T) (session.Request, *controller, response, *dnsOrigins) {
+	t.Helper()
+	checkIsolation(t)
+	t.Logf("systemd policy IPv6=%s: %s", os.Getenv("NHOP_CLIENT_IPV6"), serviceCommand(t, "--version"))
+	origin(t, "198.18.0.2:18080")
+	origin(t, "[2001:db8:feed::2]:18080")
+	udpOrigin(t)
+	dns := startDNSOrigins(t)
+	request := fixture(t)
+	probe, initial := newController(t, request)
+	checkSystemDNS(t, probe, dns, "direct")
+	return request, probe, initial, dns
+}
+
 func newManagedService(t *testing.T, probe *controller, request session.Request) managedService {
 	t.Helper()
 	root := "/run/nhop-session-test/service inputs %$"
@@ -63,11 +77,16 @@ func serviceIsolation(probePID int) string {
 
 func publishTestUnit(t *testing.T, value managedService) {
 	t.Helper()
-	if err := safeio.Create("systemd-unit.txt", value.unit, 0600); err != nil {
+	if err := safeio.Create(value.fragment, value.unit, 0600); err != nil {
 		t.Fatal(err)
 	}
-	// The outer shell can clean up this exact unit even if the Go test times out.
-	if err := safeio.Create(value.fragment, value.unit, 0600); err != nil {
+	recordTestUnit(t, value)
+}
+
+// The outer shell can clean up this exact unit even if the Go test times out.
+func recordTestUnit(t *testing.T, value managedService) {
+	t.Helper()
+	if err := safeio.Create("systemd-unit.txt", value.unit, 0600); err != nil {
 		t.Fatal(err)
 	}
 	digest, err := safeio.FileHash(value.fragment)
@@ -133,17 +152,22 @@ func (s managedService) cleanup(t *testing.T) {
 		return
 	}
 	cliCall(t, "stop")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	logs, err := exec.CommandContext(ctx, "journalctl", "--no-pager", "-u", s.name).CombinedOutput()
-	t.Logf("systemd journal: %s", logs)
-	if err != nil {
-		t.Error("cannot collect service journal", err)
-	}
+	serviceJournal(t, s.name)
 	if err := os.Remove(s.fragment); err != nil {
 		t.Error(err)
 	}
 	if data, err := manager("daemon-reload"); err != nil {
 		t.Error("cannot unload owned unit", err, string(data))
+	}
+}
+
+func serviceJournal(t *testing.T, name string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	logs, err := exec.CommandContext(ctx, "journalctl", "--no-pager", "-u", name).CombinedOutput()
+	t.Logf("systemd journal: %s", logs)
+	if err != nil {
+		t.Error("cannot collect service journal", err)
 	}
 }

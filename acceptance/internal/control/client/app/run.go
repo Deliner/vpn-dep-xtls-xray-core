@@ -10,7 +10,7 @@ import (
 	"vpn-script/internal/platform/safeio"
 )
 
-const usage = "nhop-client import --bundle DIR --route NAME --output PROFILE\nnhop-client plan --profile PROFILE --engine-uid UID --output NEW_DIR [--ipv6 tunnel|block]\nnhop-client start --profile PROFILE --runtimes INVENTORY [--ipv6 tunnel|block]\nnhop-client service-prepare\nnhop-client service-run --profile PROFILE --runtimes INVENTORY [--ipv6 tunnel|block]\nnhop-client service-plan --binary PATH --profile PROFILE --runtimes INVENTORY --output UNIT\nnhop-client diagnostics\nnhop-client reconnect\nnhop-client resume\nnhop-client stop\nstart/reconnect/resume/service-prepare/service-run/stop require Linux root; import/plan/service-plan never activate networking.\n"
+const usage = "nhop-client import --bundle DIR --route NAME --output PROFILE\nnhop-client plan --profile PROFILE --engine-uid UID --output NEW_DIR [--ipv6 tunnel|block]\nnhop-client start --profile PROFILE --runtimes INVENTORY [--ipv6 tunnel|block]\nnhop-client service-prepare\nnhop-client service-run --profile PROFILE --runtimes INVENTORY [--ipv6 tunnel|block]\nnhop-client service-plan --binary PATH --profile PROFILE --runtimes INVENTORY --output UNIT\nnhop-client service-install --profile PROFILE --runtimes INVENTORY [--ipv6 tunnel|block]\nnhop-client service-remove\nnhop-client diagnostics\nnhop-client reconnect\nnhop-client resume\nnhop-client stop\nstart/reconnect/resume/service-prepare/service-run/service-install/service-remove/stop require Linux root; import/plan/service-plan never activate networking.\n"
 
 func Run(args []string, output io.Writer) error {
 	if len(args) == 0 || args[0] == "--help" {
@@ -29,6 +29,8 @@ func Run(args []string, output io.Writer) error {
 		return plan(value, output)
 	case "service-plan":
 		return servicePlan(value, output)
+	case "service-install", "service-remove":
+		return serviceInstall(args[0], value, output)
 	case "start", "stop", "diagnostics", "reconnect", "resume", "service-run", "service-prepare":
 		return control(args[0], value, output)
 	}

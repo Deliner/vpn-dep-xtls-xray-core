@@ -11,7 +11,7 @@ import (
 )
 
 func TestSystemdCollectorRejectsMissingRecoveryLeaksAndChangedUnits(t *testing.T) {
-	for _, damage := range []string{"", "missing-controller", "direct-leak", "counter-gap", "short-log", "empty-canary", "changed-unit", "cleanup-unit", "wrong-policy"} {
+	for _, damage := range []string{"", "released-gap", "missing-controller", "direct-leak", "counter-gap", "short-log", "empty-canary", "changed-unit", "cleanup-unit", "wrong-policy", "missing-disconnect", "early-disconnect", "disconnect-gap"} {
 		t.Run(damage, func(t *testing.T) {
 			directory := t.TempDir()
 			log := serviceEvidence
@@ -30,7 +30,7 @@ func TestSystemdCollectorRejectsMissingRecoveryLeaksAndChangedUnits(t *testing.T
 			command := exec.Command("bash", "-c", `set -euo pipefail; source "$1"; client_verify_systemd "$2" "$3"`, "fixture", script, directory, "tunnel")
 			command.Env = os.Environ()
 			data, err := command.CombinedOutput()
-			if (err == nil) != (damage == "") {
+			if (err == nil) != (damage == "" || damage == "released-gap") {
 				t.Fatalf("evidence acceptance mismatch: %s: %v %s", damage, err, data)
 			}
 		})
@@ -39,6 +39,14 @@ func TestSystemdCollectorRejectsMissingRecoveryLeaksAndChangedUnits(t *testing.T
 
 func damageServiceEvidence(damage, log, unit string) (string, string) {
 	switch damage {
+	case "released-gap":
+		log = strings.ReplaceAll(log, "system DNS direct: direct=2->3", "system DNS direct: direct=3->4")
+	case "missing-disconnect":
+		log = strings.ReplaceAll(log, "system DNS disconnect requested:", "missing release:")
+	case "early-disconnect":
+		log = strings.ReplaceAll(log, "system DNS tunnel: direct=2->2 HTTPS=2->4", "system DNS disconnect requested: direct=2 HTTPS=2\nsystem DNS tunnel: direct=2->2 HTTPS=2->4")
+	case "disconnect-gap":
+		log = strings.ReplaceAll(log, "disconnect requested: direct=2", "disconnect requested: direct=3")
 	case "missing-controller":
 		log = strings.ReplaceAll(log, "systemd recovered controller;", "skipped controller;")
 	case "direct-leak":
@@ -102,6 +110,7 @@ systemd recovered restart; MainPID=456
 system DNS tunnel: direct=2->2 HTTPS=10->12
 system DNS blocked: direct=2->2 HTTPS=12->12
 systemd direct UDP: attempts=9000 delivered=0; same firewall lease retained
+system DNS disconnect requested: direct=2 HTTPS=12
 system DNS direct: direct=2->3 HTTPS=12->12
 --- PASS: TestKernelSystemdManagedRecovery (18.15s)
 PASS

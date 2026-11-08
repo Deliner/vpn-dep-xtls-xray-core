@@ -37,10 +37,11 @@ go version -m "$report/network.test" > "$report/test-build.txt"
 CGO_ENABLED=1 GOOS=linux GOARCH="$arch" go build -race -trimpath -buildvcs=false \
   -o "$report/nhop-client" ./cmd/nhop-client
 go version -m "$report/nhop-client" > "$report/client-build.txt"
-mkdir -m 0700 "$report/service" "$report/protocols"
+mkdir -m 0700 "$report/service" "$report/protocols" "$report/installed"
 for policy in tunnel block; do
   client_scenario public "$policy"
   client_scenario systemd "$policy"
+  client_scenario installed "$policy"
   client_scenario protocols "$policy"
 done
 printf 'passed\n' > "$report/status"

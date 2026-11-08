@@ -45,6 +45,11 @@ acceptance-cronet-payload arch candidate output:
 acceptance-client-run arch:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/client/run.sh "$1"
 
+# Independently bind installed service evidence to its tested bytes, private context and recovery observations.
+[group('acceptance')]
+acceptance-client-installed-verify directory policy:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/client/installed.sh "$1" "$2"
+
 # Download a completed matching CI run, restore captured Actions policy and independently verify its evidence.
 [group('acceptance')]
 acceptance-collect directory run_id:

@@ -16,17 +16,15 @@ func TestKernelSystemdManagedRecovery(t *testing.T) {
 	if os.Getenv("NHOP_CLIENT_SYSTEMD_TEST") != "private-netns" {
 		t.Skip("requires real owned Linux systemd and private networking, NSS and DNS")
 	}
-	checkIsolation(t)
-	t.Logf("systemd policy IPv6=%s: %s", os.Getenv("NHOP_CLIENT_IPV6"), serviceCommand(t, "--version"))
-	origin(t, "198.18.0.2:18080")
-	origin(t, "[2001:db8:feed::2]:18080")
-	udpOrigin(t)
-	dns := startDNSOrigins(t)
-	request := fixture(t)
-	probe, initial := newController(t, request)
-	checkSystemDNS(t, probe, dns, "direct")
+	request, probe, initial, dns := managedContext(t)
 	service := newManagedService(t, probe, request)
+	exerciseManaged(t, service, probe, initial, dns)
+}
+
+func exerciseManaged(t *testing.T, service managedService, probe *controller, initial response, dns *dnsOrigins) {
+	t.Helper()
 	started := waitManaged(t, clientcontrol.Diagnostic{})
+	protectedDNS := dns.direct.Load()
 	verifyIdentity(t, started)
 	verifyManagedNamespace(t, probe, started.Status)
 	activeTraffic(t, probe)
@@ -48,6 +46,9 @@ func TestKernelSystemdManagedRecovery(t *testing.T) {
 		t.Fatalf("managed direct leak control: attempts=%d delivered=%d", watch.attempts, canary.Load())
 	}
 	t.Logf("systemd direct UDP: attempts=%d delivered=0; same firewall lease retained", watch.attempts)
+	if dns.direct.Load() != protectedDNS {
+		t.Fatal("direct DNS escaped during the protected service lifecycle")
+	}
 	finishManaged(t, service, probe, initial, dns)
 }
 
@@ -120,6 +121,7 @@ func refuseManagedDrift(t *testing.T, service managedService, probe *controller,
 
 func finishManaged(t *testing.T, service managedService, probe *controller, initial response, dns *dnsOrigins) {
 	t.Helper()
+	t.Logf("system DNS disconnect requested: direct=%d HTTPS=%d", dns.direct.Load(), dns.tunneled.Load())
 	if result := cliCall(t, "stop"); result.Error != "" || result.Status.Phase != "stopped" {
 		t.Fatal("explicit stop failed", result)
 	}

@@ -19,7 +19,7 @@ client_lab_begin() {
     go version
     git -C "$lab_root" rev-parse HEAD
     git -C "$lab_root" status --porcelain
-    (cd "$lab_root"; find internal -name '*.go' -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256; shasum -a 256 go.mod go.sum cmd/nhop-client/main.go ops/testing/client/*.sh)
+    (cd "$lab_root"; find internal -name '*.go' -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256; shasum -a 256 go.mod go.sum cmd/nhop-client/main.go; find ops/testing/client -name '*.sh' -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256)
   } > "$run/provenance.txt"
 }
 
@@ -37,17 +37,32 @@ cd "runs/$1"
 printf '%s  package.tar.gz\n' "$2" | sha256sum --check
 tar -xzf package.tar.gz
 sha256sum --check SHA256SUMS
-before_host_files="$(sha256sum /etc/passwd /etc/group /etc/ssl/certs/ca-certificates.crt /etc/resolv.conf)"
-before_host_policy="$(ip -4 -j rule; ip -6 -j rule; findmnt -n -o OPTIONS --target /run)"
+client_host_baseline() {
+  sha256sum /etc/passwd /etc/group /etc/ssl/certs/ca-certificates.crt /etc/resolv.conf || return 1
+  ip -4 -j rule || return 1
+  ip -6 -j rule || return 1
+  findmnt -n -o OPTIONS --target /run || return 1
+}
+client_host_baseline > host-before.txt
 if sudo -n unshare --mount --net bash guest.sh "$3" "$4"; then result=0; else result=$?; fi
-[[ "$(sha256sum /etc/passwd /etc/group /etc/ssl/certs/ca-certificates.crt /etc/resolv.conf)" == "$before_host_files" ]]
-[[ "$(ip -4 -j rule; ip -6 -j rule; findmnt -n -o OPTIONS --target /run)" == "$before_host_policy" ]]
+client_host_baseline > host-after.txt
+if ! cmp host-before.txt host-after.txt; then
+  printf 'Guest host baseline changed; retained before/after records:\n' >&2
+  diff -u host-before.txt host-after.txt >&2 || true
+  exit 1
+fi
 printf 'Verified unchanged guest root NSS/CA/DNS files, IPv4/IPv6 policy rules and /run mount options\n'
 exit "$result"
 GUEST
   then result=0; else result=$?; fi
-  if [[ "$mode" == systemd ]]; then
-    for name in systemd-unit.txt systemd-unit.sha256; do
+  for name in host-before.txt host-after.txt; do
+    if lab_shell test -f "/home/nhop/runs/$run_name/$name"; then
+      lab_shell cat "/home/nhop/runs/$run_name/$name" > "$run/$name"
+    fi
+  done
+  if [[ "$mode" == systemd || "$mode" == installed ]]; then
+    for name in systemd-unit.txt systemd-unit.sha256 systemd-override.txt installed-snapshot.json \
+      installed-profile.json installed-runtimes.json installed-release.json installed-owner.json; do
       if lab_shell sudo -n test -f "/home/nhop/runs/$run_name/$name"; then
         lab_shell sudo -n cat "/home/nhop/runs/$run_name/$name" > "$run/$name"
       fi

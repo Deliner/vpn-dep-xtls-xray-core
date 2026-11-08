@@ -6,6 +6,7 @@ client_systemd_mounts() {
   mkdir -m 0711 "$NHOP_CLIENT_SYSTEMD_ROOT"
   mkdir -m 0755 "$NHOP_CLIENT_SYSTEMD_ROOT/"{resolve,netif,session}
   mkdir -m 0711 "$NHOP_CLIENT_SYSTEMD_ROOT/control"
+  if [[ "${NHOP_CLIENT_INSTALLED_TEST:-}" == private-netns ]]; then client_installed_mounts; fi
   # Stable guest-visible sources let PID 1 bind the same private state without
   # relying on resolution of /proc/PID/root magic links across mount namespaces.
   mount --bind "$NHOP_CLIENT_SYSTEMD_ROOT/resolve" /run/systemd/resolve
@@ -16,6 +17,7 @@ client_systemd_mounts() {
 client_systemd_prepare() {
   [[ "$(cat /proc/1/comm)" == systemd ]] || return 2
   export NHOP_CLIENT_SYSTEMD_UNIT="nhop-client-acceptance-$$.service"
+  if [[ "${NHOP_CLIENT_INSTALLED_TEST:-}" == private-netns ]]; then export NHOP_CLIENT_SYSTEMD_UNIT=nhop-client.service; fi
   [[ ! -e "/run/systemd/system/$NHOP_CLIENT_SYSTEMD_UNIT" && ! -L "/run/systemd/system/$NHOP_CLIENT_SYSTEMD_UNIT" ]]
   export NHOP_CLIENT_SYSTEMD_BINARY="/opt/nhop-service-test-$$/client binary %\$"
   mkdir -m 0755 "/opt/nhop-service-test-$$"
@@ -25,12 +27,14 @@ client_systemd_prepare() {
   cp bin/xray bin/sing-box bin/libcronet.so '/run/nhop-session-test/service inputs %$/'
   chmod 0755 '/run/nhop-session-test/service inputs %$/'{xray,sing-box,libcronet.so}
   export NHOP_CLIENT_SYSTEMD_TEST=private-netns
+  if [[ "${NHOP_CLIENT_INSTALLED_TEST:-}" == private-netns ]]; then export NHOP_CLIENT_BINARY="$NHOP_CLIENT_SYSTEMD_BINARY"; fi
 }
 
 client_systemd_remove_fixture() {
   [[ "$NHOP_CLIENT_SYSTEMD_ROOT" == "/run/nhop-service-test-$$" && ! -L "$NHOP_CLIENT_SYSTEMD_ROOT" ]] || return 2
   [[ ! -e "/run/systemd/system/${NHOP_CLIENT_SYSTEMD_UNIT:-}" ]] || return 2
   if mountpoint -q /etc/systemd/resolved.conf.d; then umount /etc/systemd/resolved.conf.d || return 1; fi
+  if [[ "${NHOP_CLIENT_INSTALLED_TEST:-}" == private-netns ]]; then client_installed_unmounts || return 1; fi
   rm -rf -- "$NHOP_CLIENT_SYSTEMD_ROOT" || return 1
   if [[ -n "${NHOP_CLIENT_SYSTEMD_BINARY:-}" ]]; then
     [[ "$NHOP_CLIENT_SYSTEMD_BINARY" == "/opt/nhop-service-test-$$/client binary %\$" && ! -L "/opt/nhop-service-test-$$" ]] || return 2
@@ -39,6 +43,7 @@ client_systemd_remove_fixture() {
 }
 
 client_systemd_cleanup() {
+  if [[ "${NHOP_CLIENT_INSTALLED_TEST:-}" == private-netns ]]; then client_installed_cleanup; return $?; fi
   local fragment="/run/systemd/system/$NHOP_CLIENT_SYSTEMD_UNIT"
   if [[ ! -e "$fragment" && ! -L "$fragment" ]]; then return 0; fi
   [[ -f "$fragment" && ! -L "$fragment" && -f systemd-unit.txt && -f systemd-unit.sha256 ]] || return 2
