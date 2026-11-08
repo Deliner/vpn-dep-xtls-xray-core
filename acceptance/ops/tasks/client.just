@@ -23,6 +23,16 @@ client-service-install profile runtimes ipv6='tunnel':
 client-service-remove:
     ./build/bin/nhop-client service-remove
 
+# MUTATES LINUX FILES: register early protection and client boot start; no immediate VPN/network activation.
+[group('client')]
+client-service-enable network_manager='':
+    ./build/bin/nhop-client service-enable --network-manager "$1"
+
+# MUTATES LINUX FILES: remove verified boot dependencies without releasing the current firewall policy.
+[group('client')]
+client-service-disable:
+    ./build/bin/nhop-client service-disable
+
 # Verify actual CLI installation/update/interruption/rollback/unregister with systemd only in the owned Linux VM.
 [group('client')]
 client-install-test xray singbox:
@@ -57,6 +67,11 @@ client-boot-protect:
 [group('client')]
 client-boot-test xray singbox ipv6='tunnel':
     @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/boot.sh "$1" "$2" "$3"
+
+# Verify actual systemd boot ordering, guard failure and retained protection only in the owned Linux VM.
+[group('client')]
+client-boot-order-test:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/order.sh
 
 # Show credential-free local session status; unavailable controllers are explicitly labelled.
 [group('client')]

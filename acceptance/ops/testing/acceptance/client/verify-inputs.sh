@@ -12,8 +12,12 @@ client_verify_manifest() {
 }
 
 client_verify_inputs() {
-  local kind="$1" mode="$2" name engine digest
-  local names=(network.test guest.sh resolved-guest.sh bin/xray bin/sing-box bin/libcronet.so bin/nhop-client)
+  local kind="$1" mode="$2" name binary=network.test
+  local names=(network.test guest.sh resolved-guest.sh bin/nhop-client)
+  if [[ "$kind" != boot-order ]]; then
+    names+=(bin/xray bin/sing-box bin/libcronet.so)
+  fi
+  if [[ "$kind" == install || "$kind" == boot-order ]]; then binary="$kind.test"; fi
   if [[ "$kind" == systemd || "$kind" == installed ]]; then names+=(systemd-guest.sh); fi
   if [[ "$kind" == installed ]]; then names+=(installed-guest.sh); fi
   [[ "$(cat "$mode/status")" == passed ]] || return 1
@@ -23,7 +27,7 @@ client_verify_inputs() {
   done
   [[ "$(wc -l < "$mode/inputs.sha256" | tr -d ' ')" == "${#names[@]}" ]] || return 1
   (cd "$mode"; shasum -a 256 --check inputs.sha256) >> "$report/integrity-verification.log" || return 1
-  cmp "$mode/network.test" "$report/network.test" || return 1
+  cmp "$mode/network.test" "$report/$binary" || return 1
   cmp "$mode/guest.sh" "$source_root/ops/testing/client/kernel-guest.sh" || return 1
   cmp "$mode/resolved-guest.sh" "$source_root/ops/testing/client/resolved-guest.sh" || return 1
   if [[ "$kind" == systemd || "$kind" == installed ]]; then
@@ -33,6 +37,15 @@ client_verify_inputs() {
     cmp "$mode/installed-guest.sh" "$source_root/ops/testing/client/install/managed-guest.sh" || return 1
   fi
   cmp "$mode/bin/nhop-client" "$report/nhop-client" || return 1
+  if [[ "$kind" != boot-order ]]; then client_verify_runtime_inputs "$mode" || return 1; fi
+  [[ -s "$mode/host-before.txt" && -s "$mode/host-after.txt" ]] || return 1
+  cmp "$mode/host-before.txt" "$mode/host-after.txt" || return 1
+  grep -q "native client acceptance: linux/$arch; private mount and network namespaces" "$mode/guest.log" || return 1
+  awk '/WARNING: DATA RACE/ { bad=1 } END { exit bad }' "$mode/guest.log" || return 1
+}
+
+client_verify_runtime_inputs() {
+  local mode="$1" name engine digest
   for name in xray sing-box libcronet.so; do
     engine=sing-box
     if [[ "$name" == xray ]]; then engine=xray; fi
@@ -40,8 +53,4 @@ client_verify_inputs() {
     [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
     printf '%s  %s\n' "$digest" "$mode/bin/$name" | shasum -a 256 --check >> "$report/integrity-verification.log" || return 1
   done
-  [[ -s "$mode/host-before.txt" && -s "$mode/host-after.txt" ]] || return 1
-  cmp "$mode/host-before.txt" "$mode/host-after.txt" || return 1
-  grep -q "native client acceptance: linux/$arch; private mount and network namespaces" "$mode/guest.log" || return 1
-  awk '/WARNING: DATA RACE/ { bad=1 } END { exit bad }' "$mode/guest.log" || return 1
 }

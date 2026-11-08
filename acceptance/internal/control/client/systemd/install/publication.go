@@ -9,10 +9,14 @@ import (
 	"path/filepath"
 	"time"
 
+	systemmanager "vpn-script/internal/control/client/systemd/manager"
 	"vpn-script/internal/platform/safeio"
 )
 
 func (t transaction) apply(ctx context.Context, b bundle) (Receipt, error) {
+	if err := t.store.manual(); err != nil {
+		return Receipt{}, err
+	}
 	previous, err := t.store.current()
 	if err != nil {
 		return Receipt{}, err
@@ -28,6 +32,9 @@ func (t transaction) apply(ctx context.Context, b bundle) (Receipt, error) {
 }
 
 func (t transaction) remove(ctx context.Context) error {
+	if err := t.store.manual(); err != nil {
+		return err
+	}
 	previous, err := t.store.current()
 	if err != nil {
 		return err
@@ -97,4 +104,22 @@ func (t transaction) reload(ctx context.Context, installed bool) error {
 		expected = "present"
 	}
 	return t.inactive(ctx, expected)
+}
+
+func (t transaction) inactive(ctx context.Context, expected string) error {
+	data, commandErr := t.manager(ctx, "show", "--property="+properties, "--", Service)
+	state, err := systemmanager.Parse(data, properties)
+	if err != nil {
+		return fmt.Errorf("cannot inspect client systemd state: %w", err)
+	}
+	if state["ActiveState"] != "inactive" || state["SubState"] != "dead" || state["DropInPaths"] != "" || state["Job"] != "" {
+		return fmt.Errorf("client unit is active, queued or overridden; explicitly disconnect and stop it before installation")
+	}
+	if state["LoadState"] == "not-found" && expected != "present" && state["FragmentPath"] == "" && state["UnitFileState"] == "" {
+		return nil
+	}
+	if commandErr != nil || expected == "absent" || state["LoadState"] != "loaded" || state["FragmentPath"] != t.store.unit || state["UnitFileState"] != "static" {
+		return fmt.Errorf("refusing unknown, enabled, failed or foreign systemd client unit")
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 
 	"vpn-script/internal/control/client/systemd"
+	"vpn-script/internal/control/client/systemd/boot"
 	"vpn-script/internal/control/client/systemd/install"
 	"vpn-script/internal/platform/safeio"
 )
@@ -41,4 +43,20 @@ func serviceInstall(command string, value options, output io.Writer) error {
 	}
 	_, err = fmt.Fprintf(output, "Installed generation %s at %s\nUnit: %s; inactive, manual start only; no boot protection\n", r.Generation, r.Directory, r.Unit)
 	return err
+}
+
+func serviceBoot(command string, value options, output io.Writer) error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	var receipt boot.Receipt
+	var err error
+	if command == "service-enable" {
+		receipt, err = boot.Enable(ctx, value.networkManager)
+	} else {
+		receipt, err = boot.Disable(ctx)
+	}
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(output).Encode(receipt)
 }

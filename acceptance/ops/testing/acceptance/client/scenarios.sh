@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 # Sourced by run.sh: package and execute each independent private network fixture.
 client_scenario() {
-  local kind="$1" policy="$2" mode result=0 file
+  local kind="$1" policy="$2" mode result=0 file binary=network.test
   mode="$report/$policy"
   if [[ "$kind" == systemd ]]; then mode="$report/service/$policy"; fi
   if [[ "$kind" == protocols ]]; then mode="$report/protocols/$policy"; fi
   if [[ "$kind" == installed ]]; then mode="$report/installed/$policy"; fi
   if [[ "$kind" == boot ]]; then mode="$report/boot/$policy"; fi
+  if [[ "$kind" == install || "$kind" == boot-order ]]; then
+    mode="$report/registration/$kind"
+    binary="$kind.test"
+  fi
   mkdir -m 0700 "$mode" "$mode/bin"
-  cp "$report/network.test" "$mode/network.test"
+  cp "$report/$binary" "$mode/network.test"
   cp ops/testing/client/kernel-guest.sh "$mode/guest.sh"
   cp ops/testing/client/resolved-guest.sh "$mode/resolved-guest.sh"
-  cp "build/runtime-candidates/client-xray-linux-$arch/bin/xray" "$mode/bin/"
-  cp "build/runtime-candidates/client-sing-box-linux-$arch/bin/"* "$mode/bin/"
+  if [[ "$kind" != boot-order ]]; then
+    cp "build/runtime-candidates/client-xray-linux-$arch/bin/xray" "$mode/bin/"
+    cp "build/runtime-candidates/client-sing-box-linux-$arch/bin/"* "$mode/bin/"
+  fi
   if [[ "$kind" == systemd || "$kind" == installed ]]; then
     cp ops/testing/client/systemd-guest.sh "$mode/systemd-guest.sh"
   fi

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	systemmanager "vpn-script/internal/control/client/systemd/manager"
 
 	"vpn-script/internal/control/client/host"
 	"vpn-script/internal/control/client/session"
@@ -95,7 +96,7 @@ func openTransaction() (transaction, error) {
 			return transaction{}, err
 		}
 	}
-	manager, err := systemManager()
+	manager, err := systemmanager.New()
 	if err != nil {
 		return transaction{}, err
 	}

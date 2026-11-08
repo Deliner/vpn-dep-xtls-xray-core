@@ -39,3 +39,24 @@ func TestServicePlanRejectsHiddenPathsAndDirectiveInjection(t *testing.T) {
 		t.Fatal("invalid network policy accepted")
 	}
 }
+
+func TestBootServiceRejectsInjectionAndNeverSkipsOrReleasesProtection(t *testing.T) {
+	for _, executable := range []string{"relative", "/tmp/client", "/opt/a\nConditionPathExists=/missing", "/opt/a\x00"} {
+		if _, err := systemd.BootUnit(executable); err == nil {
+			t.Fatal("unsafe boot executable accepted", executable)
+		}
+	}
+	data, err := systemd.BootUnit("/opt/client %n $HOME")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit := string(data)
+	if !strings.Contains(unit, `ExecStart=:"/opt/client %%n $HOME" "boot-protect"`) {
+		t.Fatal("boot executable can be expanded by the service manager")
+	}
+	for _, forbidden := range []string{"\nCondition", "\nExecCondition=", "\nExecStop=", "\nRuntimeDirectory="} {
+		if strings.Contains(unit, forbidden) {
+			t.Fatal("boot unit can skip or release protection", forbidden)
+		}
+	}
+}

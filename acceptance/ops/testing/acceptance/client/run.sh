@@ -37,7 +37,16 @@ go version -m "$report/network.test" > "$report/test-build.txt"
 CGO_ENABLED=1 GOOS=linux GOARCH="$arch" go build -race -trimpath -buildvcs=false \
   -o "$report/nhop-client" ./cmd/nhop-client
 go version -m "$report/nhop-client" > "$report/client-build.txt"
-mkdir -m 0700 "$report/service" "$report/protocols" "$report/installed" "$report/boot"
+for kind in install boot-order; do
+  package=./internal/control/client/systemd
+  if [[ "$kind" == install ]]; then package+=/install; fi
+  CGO_ENABLED=1 GOOS=linux GOARCH="$arch" go test -race -c -trimpath -buildvcs=false \
+    -o "$report/$kind.test" "$package"
+  go version -m "$report/$kind.test" > "$report/$kind-build.txt"
+done
+mkdir -m 0700 "$report/service" "$report/protocols" "$report/installed" "$report/boot" "$report/registration"
+client_scenario install tunnel
+client_scenario boot-order tunnel
 for policy in tunnel block; do
   client_scenario boot "$policy"
   client_scenario public "$policy"

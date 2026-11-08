@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -148,4 +149,55 @@ func readUnit(t *testing.T, tr transaction) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+func kernelCleanup(t *testing.T) {
+	t.Helper()
+	tr, err := openTransaction()
+	if err != nil {
+		t.Error("cannot inspect installation fixture for cleanup", err)
+		return
+	}
+	defer tr.store.lock.Close()
+	if err := tr.remove(context.Background()); err != nil {
+		t.Error("refusing cleanup of uncertain installation state", err)
+		return
+	}
+	if _, err := os.Lstat(UnitPath + ".d"); err == nil {
+		if err := os.Remove(UnitPath + ".d"); err != nil {
+			t.Error("retaining nonempty fixture drop-in directory", err)
+			return
+		}
+	}
+	if err := removeFixtureGenerations(tr.store); err != nil {
+		t.Error("refusing cleanup of unverified generation", err)
+		return
+	}
+	for _, name := range []string{"releases", "owner.json", "install.lock", "."} {
+		if err := os.Remove(filepath.Join(Directory, name)); err != nil {
+			t.Error("cannot remove empty owned installation fixture", err)
+			return
+		}
+	}
+}
+
+func removeFixtureGenerations(s *store) error {
+	entries, err := os.ReadDir(filepath.Join(s.base, "releases"))
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if _, err := s.generation(entry.Name()); err != nil {
+			return err
+		}
+	}
+	for _, entry := range entries {
+		directory := filepath.Join(s.base, "releases", entry.Name())
+		for _, name := range []string{"nhop-client", "xray", "sing-box", "libcronet.so", "profile.json", "runtimes.json", "release.json", "unit", "."} {
+			if err := os.Remove(filepath.Join(directory, name)); err != nil {
+				return fmt.Errorf("fixture generation cleanup: %w", err)
+			}
+		}
+	}
+	return nil
 }

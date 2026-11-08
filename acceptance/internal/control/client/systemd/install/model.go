@@ -3,18 +3,20 @@
 package install
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 
 	"vpn-script/internal/control/client/controller"
 	"vpn-script/internal/control/client/network"
 	"vpn-script/internal/control/client/session"
+	systemmanager "vpn-script/internal/control/client/systemd/manager"
 )
 
 const Service = "nhop-client.service"
 const Directory = "/var/lib/nhop-client"
 const UnitPath = "/etc/systemd/system/" + Service
+const BootStatePath = Directory + "/boot.json"
+const properties = "LoadState,ActiveState,SubState,FragmentPath,DropInPaths,UnitFileState,Job"
 const marker = "# nhop-client installation v1 "
 
 type Options = controller.Options
@@ -55,7 +57,7 @@ type store struct {
 	lock       *os.File
 }
 
-type manager func(context.Context, ...string) ([]byte, error)
+type manager = systemmanager.Command
 
 type transaction struct {
 	store   *store

@@ -167,3 +167,31 @@ func corruptGeneration(t *testing.T, path, kind string) {
 		t.Fatal(err)
 	}
 }
+
+func TestRetainedBootIntentBlocksUpdateAndRemovalButAllowsSnapshotVerification(t *testing.T) {
+	tr, _, b := installation(t)
+	installed, err := tr.apply(t.Context(), b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(tr.store.base, filepath.Base(BootStatePath))
+	if err := safeio.NewJSON(path, map[string]string{"phase": "enabling"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr.apply(t.Context(), b); err == nil {
+		t.Fatal("update ignored retained boot intent")
+	}
+	if err := tr.remove(t.Context()); err == nil {
+		t.Fatal("unregister ignored retained boot intent")
+	}
+	snapshot, err := tr.store.snapshot()
+	if err != nil || snapshot.Receipt != installed || snapshot.OwnerToken != tr.store.owner.Token {
+		t.Fatal("boot registration cannot inspect the locked immutable installation", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.remove(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}

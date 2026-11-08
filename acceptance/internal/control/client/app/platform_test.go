@@ -14,7 +14,7 @@ func TestActivationCommandsRefuseMacBeforeReadingInputs(t *testing.T) {
 		t.Skip("macOS host safety contract")
 	}
 	for _, args := range [][]string{{"start", "--profile", "/does/not/exist", "--runtimes", "/does/not/exist"}, {"stop"}, {"diagnostics"}, {"reconnect"}, {"resume"}, {"service-prepare"}, {"boot-protect"},
-		{"service-run", "--profile", "missing", "--runtimes", "missing"}, {"service-install", "--profile", "missing", "--runtimes", "missing"}, {"service-remove"}} {
+		{"service-run", "--profile", "missing", "--runtimes", "missing"}, {"service-install", "--profile", "missing", "--runtimes", "missing"}, {"service-remove"}, {"service-enable"}, {"service-disable"}} {
 		var output bytes.Buffer
 		err := app.Run(args, &output)
 		if err == nil || !strings.Contains(err.Error(), "Linux root") || output.Len() != 0 {

@@ -17,6 +17,7 @@ case "${1:-policy}" in
   systemd) pattern='^TestKernelSystemdManagedRecovery$' ;;
   protocols) pattern='^TestKernelAllProtocolTUN$' ;;
   installed) pattern='^TestKernelInstalledServiceManagedRecovery$'; export NHOP_CLIENT_INSTALLED_TEST=private-netns ;;
+  boot-order) pattern='^TestKernelBootOrderingFailsClosed$'; export NHOP_CLIENT_BOOT_ORDER_TEST=private-netns ;;
   install) pattern='^TestKernelClientServiceInstallation$' ;;
   *) exit 2 ;;
 esac
@@ -93,7 +94,10 @@ if [[ "${1:-}" == systemd || "${1:-}" == installed ]]; then
   client_systemd_prepare
 fi
 test_timeout=2m
-if [[ "${1:-}" == install ]]; then
+if [[ "${1:-}" == install || "${1:-}" == boot-order ]]; then
+  if [[ -n "${NHOP_CLIENT_CI:-}" ]]; then
+    printf 'native client acceptance: %s; private mount and network namespaces\n' "$NHOP_CLIENT_CI"
+  fi
   [[ "$(cat /proc/1/comm)" == systemd ]]
   [[ ! -e /var/lib/nhop-client && ! -L /var/lib/nhop-client ]]
   [[ ! -e /etc/systemd/system/nhop-client.service && ! -L /etc/systemd/system/nhop-client.service ]]
@@ -108,7 +112,7 @@ if [[ "${1:-}" == protocols ]]; then
 fi
 NHOP_CLIENT_KERNEL_TEST=private-netns NHOP_CLIENT_RUNTIME="$PWD/bin" ./network.test \
   -test.run "$pattern" -test.v -test.timeout="$test_timeout"
-case "${1:-}" in resolver|session|public|boot|systemd|protocols|install|installed) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
+case "${1:-}" in resolver|session|public|boot|systemd|protocols|install|installed|boot-order) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
 if [[ "${1:-}" == install || "${1:-}" == installed ]]; then
   [[ ! -e /var/lib/nhop-client && ! -L /var/lib/nhop-client ]]
   [[ ! -e /etc/systemd/system/nhop-client.service && ! -L /etc/systemd/system/nhop-client.service ]]

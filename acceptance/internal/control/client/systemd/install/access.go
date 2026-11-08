@@ -75,3 +75,15 @@ func (s *store) readOwner() error {
 	}
 	return s.access(filepath.Join(s.base, "releases"), os.ModeDir|0700)
 }
+
+// Any retained boot intent blocks manual update/unregister until explicitly disabled.
+func (s *store) manual() error {
+	_, err := os.Lstat(filepath.Join(s.base, filepath.Base(BootStatePath)))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("client boot registration is retained; use service-disable before changing installation")
+}

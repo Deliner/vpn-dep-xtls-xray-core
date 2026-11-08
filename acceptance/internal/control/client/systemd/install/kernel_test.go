@@ -10,10 +10,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+	systemmanager "vpn-script/internal/control/client/systemd/manager"
 
 	"vpn-script/internal/control/client/controller"
 	"vpn-script/internal/control/client/host"
 	"vpn-script/internal/control/client/session"
+	"vpn-script/internal/control/client/systemd"
 	"vpn-script/internal/platform/safeio"
 )
 
@@ -27,6 +29,7 @@ func TestKernelClientServiceInstallation(t *testing.T) {
 	args := []string{"service-install", "--profile", options.Profile, "--runtimes", options.Runtimes}
 	kernelCLI(t, true, args...)
 	first, unit := kernelInstalled(t)
+	kernelBootRegistration(t)
 	kernelCLI(t, true, args...)
 	if next, data := kernelInstalled(t); next != first || !bytes.Equal(data, unit) {
 		t.Fatal("real idempotent install changed the generation")
@@ -156,7 +159,7 @@ func kernelInterrupted(t *testing.T, args []string, desired Receipt) {
 		t.Fatal("cannot simulate a committed update interrupted before daemon-reload", err)
 	}
 	tr.store.lock.Close()
-	manager, err := systemManager()
+	manager, err := systemmanager.New()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +185,7 @@ func kernelPinUnit(t *testing.T) {
 	if err := safeio.Create(path, unit, 0600); err != nil {
 		t.Fatal(err)
 	}
-	manager, err := systemManager()
+	manager, err := systemmanager.New()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,47 +217,58 @@ func kernelUnpin(t *testing.T, manager manager, name, path string, expected []by
 	}
 }
 
-func kernelCleanup(t *testing.T) {
+func kernelBootRegistration(t *testing.T) {
 	t.Helper()
-	tr, err := openTransaction()
+	defer kernelCLI(t, true, "service-disable")
+	kernelCLI(t, false, "service-enable", "--network-manager", "networking.service")
+	kernelCLI(t, true, "service-enable")
+	kernelCLI(t, true, "service-enable")
+	kernelCLI(t, false, "service-remove")
+	command, err := systemmanager.New()
 	if err != nil {
-		t.Error("cannot inspect installation fixture for cleanup", err)
-		return
+		t.Fatal(err)
 	}
-	defer tr.store.lock.Close()
-	if err := tr.remove(context.Background()); err != nil {
-		t.Error("refusing cleanup of uncertain installation state", err)
-		return
+	kernelBootDependencies(t, command)
+	data, err := command(t.Context(), "show", "--value", "--property=ActiveState", "--", systemd.BootService)
+	if err != nil || strings.TrimSpace(string(data)) != "inactive" {
+		t.Fatal("enable unexpectedly started early protection", err, string(data))
 	}
-	if err := removeFixtureGenerations(tr.store); err != nil {
-		t.Error("refusing cleanup of unverified generation", err)
-		return
+	kernelCLI(t, true, "service-disable")
+	if _, err := os.Lstat(BootStatePath); !os.IsNotExist(err) {
+		t.Fatal("explicit disable retained registration", err)
 	}
-	for _, name := range []string{"releases", "owner.json", "install.lock", "."} {
-		if err := os.Remove(filepath.Join(Directory, name)); err != nil {
-			t.Error("cannot remove empty owned installation fixture", err)
-			return
-		}
-	}
+	t.Log("boot registration verified: disabled by default, enable/idempotent/dependencies/unregister refusal/disable; no service activation")
 }
 
-func removeFixtureGenerations(s *store) error {
-	entries, err := os.ReadDir(filepath.Join(s.base, "releases"))
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if _, err := s.generation(entry.Name()); err != nil {
-			return err
+func kernelBootDependencies(t *testing.T, command manager) {
+	t.Helper()
+	loaded := 0
+	for _, unit := range []string{"systemd-networkd.service", "NetworkManager.service"} {
+		path := filepath.Join(filepath.Dir(UnitPath), unit+".d", "90-nhop-boot.conf")
+		data, err := safeio.Read(path, 4096)
+		if err != nil || !bytes.HasSuffix(data, []byte(systemd.BootRequirement)) {
+			t.Fatal("network manager has no persistent protection dependency", unit, err)
 		}
-	}
-	for _, entry := range entries {
-		directory := filepath.Join(s.base, "releases", entry.Name())
-		for _, name := range []string{"nhop-client", "xray", "sing-box", "libcronet.so", "profile.json", "runtimes.json", "release.json", "unit", "."} {
-			if err := os.Remove(filepath.Join(directory, name)); err != nil {
-				return fmt.Errorf("fixture generation cleanup: %w", err)
+		data, commandErr := command(t.Context(), "show", "--property=LoadState,Requires,After", "--", unit)
+		state, err := systemmanager.Parse(data, "LoadState,Requires,After")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if state["LoadState"] == "not-found" {
+			t.Log("absent alternative manager has a persistent boot protection drop-in", unit)
+			continue
+		}
+		if commandErr != nil || state["LoadState"] != "loaded" {
+			t.Fatal("cannot inspect network manager dependencies", commandErr, state)
+		}
+		loaded++
+		for _, key := range []string{"Requires", "After"} {
+			if !strings.Contains(" "+state[key]+" ", " "+systemd.BootService+" ") {
+				t.Fatal("network manager can start without early protection", unit, key, state)
 			}
 		}
 	}
-	return nil
+	if loaded == 0 {
+		t.Fatal("registration has no loaded supported manager")
+	}
 }

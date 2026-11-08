@@ -1,4 +1,4 @@
-// Package systemd renders a manually started client service; it never installs it.
+// Package systemd renders client and early protection units; it never installs them.
 package systemd
 
 import (
@@ -59,7 +59,7 @@ func quote(value string) string {
 	return `"` + escaped + `"`
 }
 
-const preamble = `# Manual start only: early-boot protection is not implemented.
+const preamble = `# Manual start by default; service-enable registers early protection separately.
 [Unit]
 Description=N-hop Linux client with retained kill switch
 Wants=network-online.target

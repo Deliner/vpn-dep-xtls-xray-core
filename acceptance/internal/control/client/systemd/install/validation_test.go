@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	systemmanager "vpn-script/internal/control/client/systemd/manager"
 
 	"vpn-script/internal/platform/safeio"
 )
@@ -99,7 +100,7 @@ func TestInputsRejectChangedRuntimeWrongCPUAndUnsafeProfile(t *testing.T) {
 
 func TestDuplicateOrMissingSystemdFieldsAreNotAnInactiveService(t *testing.T) {
 	for _, raw := range []string{"", "ActiveState=inactive\n", "ActiveState=inactive\nActiveState=active\n", "invalid"} {
-		if _, err := parseState([]byte(raw)); err == nil {
+		if _, err := systemmanager.Parse([]byte(raw), properties); err == nil {
 			t.Fatal("incomplete manager response accepted")
 		}
 	}

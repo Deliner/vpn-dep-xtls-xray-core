@@ -156,3 +156,65 @@ func bootEvidence() string {
 	log.WriteString("--- PASS: TestKernelBootProtectionHandoff (8s)\nPASS\n")
 	return log.String()
 }
+
+func TestRegistrationCollectorRequiresEachLifecycleAndFailureControl(t *testing.T) {
+	for _, kind := range []string{"install", "boot-order"} {
+		for name, change := range registrationDamage(kind) {
+			t.Run(kind+"/"+name, func(t *testing.T) {
+				directory := t.TempDir()
+				log := strings.ReplaceAll(registrationEvidence(kind), change[0], change[1])
+				write(t, filepath.Join(directory, "guest.log"), log, 0600)
+				command := exec.Command("bash", "-c", `set -euo pipefail; source "$1"; if client_verify_registration "$2" "$3"; then exit 0; else exit 1; fi`,
+					"fixture", "../../../ops/testing/acceptance/client/verify-registration.sh", kind, directory)
+				output, err := command.CombinedOutput()
+				if (err == nil) != (name == "valid") {
+					t.Fatalf("registration evidence mismatch: %v %s", err, output)
+				}
+			})
+		}
+	}
+}
+
+func registrationDamage(kind string) map[string][2]string {
+	changes := map[string][2]string{
+		"valid": {"unused", "unused"}, "failed-root": {"--- PASS:", "--- FAIL:"},
+		"missing-completion": {"\nPASS\n", "\n"}, "duplicate-completion": {"\nPASS\n", "\nPASS\nPASS\n"},
+		"race": {"\nPASS\n", "\nWARNING: DATA RACE\nPASS\n"},
+	}
+	if kind == "install" {
+		changes["missing-disable"] = [2]string{"service-disable success=true", "missing-disable success=true"}
+		changes["missing-refusal"] = [2]string{"service-remove success=false", "service-remove success=true"}
+		changes["same-generation"] = [2]string{strings.Repeat("b", 64), strings.Repeat("a", 64)}
+		changes["short-generation"] = [2]string{strings.Repeat("a", 64), "a"}
+		changes["missing-registration"] = [2]string{"boot registration verified:", "boot registration omitted:"}
+	} else {
+		changes["missing-weak-control"] = [2]string{"control: Wants+After", "omitted: Wants+After"}
+		changes["missing-failure"] = [2]string{"required protection:", "omitted protection:"}
+		changes["duplicate-failure"] = [2]string{"required protection:", "required protection: failure blocks dependent activation\nrequired protection:"}
+		changes["missing-retained-firewall"] = [2]string{"unit stop retains firewall", "unit stop clears firewall"}
+		changes["missing-explicit-stop"] = [2]string{"explicit client stop restores connectivity", "omitted explicit stop"}
+	}
+	return changes
+}
+
+func registrationEvidence(kind string) string {
+	if kind == "boot-order" {
+		return `control: Wants+After permits dependent activation after protection failure
+required protection: failure blocks dependent activation
+native systemd verified: successful protection precedes dependent; unit stop retains firewall; explicit client stop restores connectivity
+--- PASS: TestKernelBootOrderingFailsClosed (2s)
+PASS
+`
+	}
+	return fmt.Sprintf(`actual CLI service-enable success=false: supported network managers:
+actual CLI service-enable success=true: {}
+actual CLI service-enable success=true: {}
+actual CLI service-remove success=false: client boot registration is retained;
+actual CLI service-disable success=true: {}
+actual CLI service-disable success=true: {}
+boot registration verified: disabled by default, enable/idempotent/dependencies/unregister refusal/disable; no service activation
+installation verified: initial/idempotent/update/rollback/interrupted reload/remove; generations %s %s retained
+--- PASS: TestKernelClientServiceInstallation (4s)
+PASS
+`, strings.Repeat("a", 64), strings.Repeat("b", 64))
+}
