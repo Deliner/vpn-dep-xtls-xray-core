@@ -41,6 +41,24 @@ func TestProbeRetainsQueueBoundAndNormalEnqueue(t *testing.T) {
 	}
 }
 
+func TestBudgetProbeDoesNotChangeQueueAdmission(t *testing.T) {
+	fixture := strings.Replace(queueFixture, "len(s.queue) >= streamDatagramQueueLen", "!s.queue.push(data)", 1)
+	fixture = strings.Replace(fixture, "\ts.queue = append(s.queue, data)\n", "", 1)
+	modified, err := instrumentMasqueQueue([]byte(fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Count(modified, []byte("s.queue.push(data)")) != 1 || bytes.Contains(modified, []byte("append(s.queue")) {
+		t.Fatal("probe changed or duplicated bounded queue admission")
+	}
+	if !bytes.Contains(modified, []byte("s.queue.count")) || !bytes.Contains(modified, []byte("NHOP_H3_QUEUE_DROP")) {
+		t.Fatal("probe did not observe the configured queue")
+	}
+	if _, err := instrumentMasqueQueue(modified); err == nil {
+		t.Fatal("probe instrumented a modified bounded queue again")
+	}
+}
+
 func TestProbeRejectsUnreviewedSourceWithoutReplacingFiles(t *testing.T) {
 	directory := t.TempDir()
 	source := filepath.Join(directory, "source.go")

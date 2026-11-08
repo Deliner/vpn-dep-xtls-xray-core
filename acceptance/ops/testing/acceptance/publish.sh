@@ -7,9 +7,7 @@ acceptance_identity
 acceptance_directory "$1"
 [[ "$(cat "$acceptance_output/status")" == prepared ]] || { printf 'This preparation has already been published or attempted; inspect its state.\n' >&2; exit 2; }
 [[ "$(git -C "$acceptance_root" rev-parse HEAD)" == "$(cat "$acceptance_output/project.commit")" ]] || exit 2
-permissions="$(gh api --hostname github.com "repos/$acceptance_repo/actions/permissions" --jq '[.enabled,.allowed_actions]|@tsv')"
-[[ "$permissions" == $'false\tall' || "$permissions" == $'true\tall' ]] || { printf 'Unreviewed Actions policy; preserve it and inspect before publication.\n' >&2; exit 2; }
-printf '{"enabled":%s,"allowed_actions":"all"}\n' "${permissions%%$'\t'*}" > "$acceptance_output/actions-before.json"
+acceptance_capture_actions
 gh api --hostname github.com --paginate "repos/$acceptance_repo/actions/workflows?per_page=100" \
   --jq '.workflows[]|[.id,.state,.path]|@tsv' > "$acceptance_output/workflows-before.tsv"
 printf 'disabling-inherited-workflows\n' > "$acceptance_output/status"
@@ -22,6 +20,7 @@ while IFS=$'\t' read -r workflow_id workflow_state workflow_path; do
   if [[ "$workflow_path" == .github/workflows/nhop-acceptance.yml ]]; then prepared_workflow="$workflow_id"; fi
 done < "$acceptance_output/workflows-before.tsv"
 gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/permissions" -F enabled=true
+acceptance_verify_enabled_policy
 if [[ -n "$prepared_workflow" ]]; then
   gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/workflows/$prepared_workflow/enable"
 fi

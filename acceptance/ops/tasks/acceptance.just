@@ -3,6 +3,18 @@
 acceptance-prepare output suite='protocols':
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/prepare.sh "$1" "$2"
 
+# Read the owned CI repository's Actions policy, workflows and runs for one exact preparation.
+[group('acceptance')]
+acceptance-status directory:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source ops/testing/acceptance/identity.sh
+    acceptance_identity
+    acceptance_directory "$1"
+    gh api --hostname github.com "repos/$acceptance_repo/actions/permissions" --jq .
+    gh api --hostname github.com --paginate "repos/$acceptance_repo/actions/workflows?per_page=100" --jq '.workflows[]|{id,state,path}'
+    gh api --hostname github.com "repos/$acceptance_repo/actions/runs?head_sha=$acceptance_commit&per_page=100" --jq '.workflow_runs[]|{id,status,conclusion,head_sha,html_url}'
+
 # MUTATES GITHUB: enable only the prepared acceptance run after disabling inherited workflows, then push without force.
 [group('acceptance')]
 acceptance-publish directory:

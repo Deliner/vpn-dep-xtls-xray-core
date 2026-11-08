@@ -1,11 +1,53 @@
 package acceptance
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestPublicationPreservesOmittedDisabledPolicyAndPinning(t *testing.T) {
+	f := newFixture(t)
+	command := f.command("publish.sh", f.output)
+	command.Env = append(command.Env, "CI_TEST_POLICY=absent", "CI_TEST_PINNING=true")
+	if output, err := command.CombinedOutput(); err == nil {
+		t.Fatalf("fixture push must remain a failure: %s", output)
+	}
+	raw, err := os.ReadFile(filepath.Join(f.output, "actions-before.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policy map[string]any
+	if err := json.Unmarshal(raw, &policy); err != nil || len(policy) != 2 || policy["enabled"] != false || policy["sha_pinning_required"] != true {
+		t.Fatalf("invented or lost the original policy: %s %v", raw, err)
+	}
+	trace, err := os.ReadFile(f.trace)
+	if err != nil || !strings.HasSuffix(string(trace), "push\n") || strings.Count(string(trace), "/actions/permissions --jq") != 2 {
+		t.Fatalf("enabled policy was not verified before push: %s %v", trace, err)
+	}
+}
+
+func TestPublicationRestoresUnreviewedOrUnreadableEnabledPolicy(t *testing.T) {
+	for _, scenario := range []string{"CI_TEST_ACTIVE_POLICY=selected", "CI_TEST_POLICY_READ_FAILURE=1"} {
+		f := newFixture(t)
+		command := f.command("publish.sh", f.output)
+		command.Env = append(command.Env, "CI_TEST_POLICY=absent", scenario)
+		if output, err := command.CombinedOutput(); err == nil {
+			t.Fatalf("unreviewed policy accepted: %s", output)
+		}
+		trace, err := os.ReadFile(f.trace)
+		if err != nil || strings.Contains(string(trace), "\npush\n") || !strings.Contains(string(trace), "/actions/permissions --input") {
+			t.Fatalf("unreviewed policy was not restored without publishing: %s %v", trace, err)
+		}
+		state, err := os.ReadFile(filepath.Join(f.output, "actions-state"))
+		if err != nil || string(state) != "restored\n" {
+			t.Fatalf("missing restoration evidence: %q %v", state, err)
+		}
+
+	}
+}
 
 func TestPublicationCannotEnableActionsBeforeInheritedWorkflowsAreDisabled(t *testing.T) {
 	f := newFixture(t)

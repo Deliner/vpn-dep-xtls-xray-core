@@ -18,7 +18,12 @@ case "$*" in
   'api --hostname github.com repos/Deliner/vpn-dep-xtls-xray-core --jq '*)
     printf '1449369505\t26311467\tDeliner/vpn-dep-xtls-xray-core\tfalse\ttrue\n' ;;
   'api --hostname github.com repos/Deliner/vpn-dep-xtls-xray-core/actions/permissions --jq '*)
-    printf '%s\t%s\n' "${CI_TEST_ENABLED:-false}" "${CI_TEST_POLICY:-all}" ;;
+    if grep -q -- '-F enabled=true' "$CI_TEST_TRACE"; then
+      [[ "${CI_TEST_POLICY_READ_FAILURE:-0}" == 0 ]] || exit 31
+      printf 'true\t%s\t%s\n' "${CI_TEST_ACTIVE_POLICY:-all}" "${CI_TEST_PINNING:-false}"
+    else
+      printf '%s\t%s\t%s\n' "${CI_TEST_ENABLED:-false}" "${CI_TEST_POLICY:-all}" "${CI_TEST_PINNING:-false}"
+    fi ;;
   'api --hostname github.com --paginate '*'/actions/workflows?per_page=100 --jq '*)
     printf '101\tactive\t.github/workflows/upstream.yml\n102\tdisabled_manually\t.github/workflows/other.yml\n'
     if [[ "${CI_TEST_REGISTERED:-0}" == 1 ]]; then printf '303\tactive\t.github/workflows/nhop-acceptance.yml\n'; fi ;;

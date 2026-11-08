@@ -10,6 +10,13 @@ import (
 	"time"
 )
 
+// OpenTCPProbe connects to the synthetic lab origin 198.18.0.2 through SOCKS.
+// The caller owns the returned stream and its payload deadline.
+func OpenTCPProbe(ctx context.Context, port, target int) (net.Conn, error) {
+	connection, _, err := socksOpen(ctx, port, target, 1)
+	return connection, err
+}
+
 func socksOpen(ctx context.Context, port, target int, command byte) (net.Conn, int, error) {
 	dialer := net.Dialer{Timeout: 5 * time.Second}
 	connection, err := dialer.DialContext(ctx, "tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))

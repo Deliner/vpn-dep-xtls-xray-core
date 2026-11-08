@@ -83,6 +83,39 @@ dependency-ref repository ref:
 dependency-test directory packages pattern='Test' tags='':
     @CGO_ENABLED=1 bash ops/quality/check.sh static-analysis go -C "$1" test -count=1 -race -v -tags "$4" -run "$3" "$2"
 
+# Refresh an owned checkout's Go locks after reviewed module edits, then verify authenticated module content.
+[group('dependencies')]
+dependency-lock directory:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    directory="$(cd "$1" && pwd -P)"
+    root="$(pwd -P)"
+    case "$directory/" in "$root/build/dependencies/checkouts/"*) ;; *) exit 2 ;; esac
+    [[ "$(git -C "$directory" rev-parse --show-toplevel)" == "$directory" ]] || exit 2
+    export GOWORK=off GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org
+    export GOPRIVATE= GONOPROXY= GONOSUMDB=
+    GOFLAGS=-mod=mod bash ops/quality/check.sh static-analysis go -C "$directory" mod tidy
+    bash ops/quality/check.sh static-analysis go -C "$directory" mod verify
+
+# Format explicitly selected Go files in an owned dependency checkout with the pinned toolchain.
+[group('dependencies')]
+dependency-format directory +files:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    directory="$(cd "$1" && pwd -P)"
+    root="$(pwd -P)"
+    case "$directory/" in "$root/build/dependencies/checkouts/"*) ;; *) exit 2 ;; esac
+    [[ "$(git -C "$directory" rev-parse --show-toplevel)" == "$directory" ]] || exit 2
+    shift
+    selected=()
+    for file in "$@"; do
+      [[ "$file" == *.go && -f "$directory/$file" && ! -L "$directory/$file" ]] || exit 2
+      resolved="$(cd "$(dirname "$directory/$file")" && pwd -P)/$(basename "$file")"
+      case "$resolved" in "$directory/"*) ;; *) exit 2 ;; esac
+      selected+=("$resolved")
+    done
+    gofmt -w "${selected[@]}"
+
 # MUTATES GITHUB: publish a committed maintenance branch without force or default-branch changes.
 [group('dependencies')]
 dependency-push repository:

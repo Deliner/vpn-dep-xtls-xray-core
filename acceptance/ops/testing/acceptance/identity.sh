@@ -20,6 +20,41 @@ acceptance_directory() {
   [[ "$(git -C "$acceptance_checkout" remote get-url origin)" == "https://github.com/$acceptance_repo.git" ]] || return 2
 }
 
+acceptance_actions_policy() {
+  gh api --hostname github.com "repos/$acceptance_repo/actions/permissions" --jq \
+    '[.enabled, (if has("allowed_actions") then .allowed_actions else "absent" end), (if has("sha_pinning_required") then .sha_pinning_required else "absent" end)]|@tsv'
+}
+
+acceptance_capture_actions() {
+  local policy
+  policy="$(acceptance_actions_policy)"
+  IFS=$'\t' read -r actions_enabled actions_allowed actions_pinning <<< "$policy"
+  case "$actions_enabled:$actions_allowed" in true:all|false:all|false:absent) ;; *)
+    printf 'Unreviewed Actions policy; preserve it and inspect before publication.\n' >&2; return 2 ;;
+  esac
+  case "$actions_pinning" in true|false|absent) ;; *) return 2 ;; esac
+  {
+    printf '{"enabled":%s' "$actions_enabled"
+    if [[ "$actions_allowed" != absent ]]; then printf ',"allowed_actions":"%s"' "$actions_allowed"; fi
+    if [[ "$actions_pinning" != absent ]]; then printf ',"sha_pinning_required":%s' "$actions_pinning"; fi
+    printf '}\n'
+  } > "$acceptance_output/actions-before.json"
+}
+
+acceptance_verify_enabled_policy() {
+  local policy enabled allowed pinning
+  if ! policy="$(acceptance_actions_policy)"; then
+    acceptance_restore_actions
+    return 2
+  fi
+  IFS=$'\t' read -r enabled allowed pinning <<< "$policy"
+  if [[ "$enabled:$allowed" == true:all && "$pinning" == "$actions_pinning" ]]; then return; fi
+  printf 'Enabled Actions policy differs from the reviewed contract; restoring without a push.\n' >&2
+  acceptance_restore_actions
+  printf 'policy-review-required\n' > "$acceptance_output/status"
+  return 2
+}
+
 acceptance_restore_actions() {
   # Restore the captured repository policy before re-enabling formerly active workflows.
   gh api --hostname github.com --method PUT "repos/$acceptance_repo/actions/permissions" \

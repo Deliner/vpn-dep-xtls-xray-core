@@ -9,10 +9,8 @@ import (
 	"vpn-script/internal/platform/safeio"
 )
 
-const masqueQueueSource = "fb9d3debf96571f2a468a9bbccdeb6112659dcde63f990e5d6a7236cfc44b1df"
-
 // MasqueOverlay instruments one exact dependency file without changing the module
-// cache or candidate source. The probe observes queue drops; its bound stays 32.
+// cache or candidate source. The probe observes drops without changing queue policy.
 func MasqueOverlay(source, output string) error {
 	source, err := filepath.Abs(source)
 	if err != nil {
@@ -22,8 +20,9 @@ func MasqueOverlay(source, output string) error {
 	if err != nil {
 		return err
 	}
-	if fmt.Sprintf("%x", sha256.Sum256(raw)) != masqueQueueSource {
-		return fmt.Errorf("unreviewed HTTP/3 queue source; diagnostic overlay refused")
+	policy, sourceSHA, err := masqueQueuePolicy(raw)
+	if err != nil {
+		return err
 	}
 	modified, err := instrumentMasqueQueue(raw)
 	if err != nil {
@@ -41,7 +40,8 @@ func MasqueOverlay(source, output string) error {
 		return err
 	}
 	return safeio.JSON(filepath.Join(output, "probe.json"), map[string]any{
-		"kind": "diagnostic-only", "target": source, "target_sha256": masqueQueueSource,
-		"instrumented_sha256": fmt.Sprintf("%x", sha256.Sum256(modified)), "queue_limit": 32,
+		"kind": "diagnostic-only", "target": source, "target_sha256": sourceSHA,
+		"instrumented_sha256": fmt.Sprintf("%x", sha256.Sum256(modified)), "default_queue_limit": 32,
+		"queue_policy": policy,
 	})
 }
