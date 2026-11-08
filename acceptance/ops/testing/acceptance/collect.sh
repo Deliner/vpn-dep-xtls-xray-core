@@ -8,10 +8,10 @@ acceptance_directory "$1"
 run_id="$2"
 gh run view "$run_id" --repo "$acceptance_repo" --json databaseId,headSha,headBranch,status,conclusion,url,event > "$acceptance_output/run.json"
 [[ "$(gh run view "$run_id" --repo "$acceptance_repo" --json headSha,headBranch,status,event --jq '[.headSha,.headBranch,.status,.event]|@tsv')" == "$acceptance_commit"$'\tnhop-acceptance\tcompleted\tpush' ]] || { printf 'Run identity differs or the run is still live.\n' >&2; exit 2; }
+acceptance_restore_actions
 collection="$(mktemp -d "$acceptance_output/collection-XXXXXXXX")"
 gh run download "$run_id" --repo "$acceptance_repo" --dir "$collection"
 gh run view "$run_id" --repo "$acceptance_repo" --log > "$collection/workflow.log"
-acceptance_restore_actions
 if [[ "$(gh run view "$run_id" --repo "$acceptance_repo" --json conclusion --jq .conclusion)" != success ]]; then
   printf 'workflow-failed\n' > "$acceptance_output/status"
   printf 'Workflow failed; preserved results: %s\n' "$collection" >&2

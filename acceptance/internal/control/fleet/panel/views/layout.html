@@ -1,0 +1,29 @@
+{{define "header"}}<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · N-hop Fleet</title><link rel="stylesheet" href="/panel/style.css"></head>
+<body class="{{if .Authenticated}}workspace{{else}}signed-out{{end}}">
+{{if .Authenticated}}<aside class="sidebar"><a class="brand" href="/panel/"><span class="brand-mark">N</span><span>N-hop <b>Fleet</b></span></a>
+<div class="nav-caption">УПРАВЛЕНИЕ</div><nav aria-label="Основная навигация">
+<a href="/panel/" {{if eq .Section "overview"}}aria-current="page"{{end}}><span aria-hidden="true">▦</span> Обзор флота</a>
+<a href="/panel/nodes" {{if eq .Section "nodes"}}aria-current="page"{{end}}><span aria-hidden="true">◫</span> Узлы</a>
+<a href="/panel/rollouts" {{if eq .Section "rollouts"}}aria-current="page"{{end}}><span aria-hidden="true">↗</span> Обновления</a>
+<a href="/panel/prepare" {{if eq .Section "prepare"}}aria-current="page"{{end}}><span aria-hidden="true">＋</span> Подготовка</a>
+</nav><div class="sidebar-bottom"><div class="connection"><span class="connection-dot"></span> Централизованный контроль</div><p>Узлы получают задания<br>через исходящие соединения.</p>
+<form method="post" action="/panel/logout">{{template "csrf" .}}<button class="logout" type="submit">Выйти из панели ↗</button></form></div></aside>{{end}}
+<main class="main"><header class="page-header"><div><p class="eyebrow">N-HOP / FLEET MANAGEMENT</p><h1>{{.Title}}</h1></div>
+{{if .Authenticated}}<a class="button secondary" href="/panel/enroll">＋ Добавить узел</a>{{end}}</header>
+{{if .Error}}<div class="notice error" role="alert">{{.Error}}</div>{{end}}
+{{if .Message}}<div class="notice" role="status">{{.Message}}</div>{{end}}{{end}}
+
+{{define "footer"}}<footer class="page-footer">N-hop Fleet <span>Состояние обновляется при загрузке страницы · Время UTC</span></footer></main></body></html>{{end}}
+{{define "csrf"}}<input type="hidden" name="csrf" value="{{.CSRF}}">{{end}}
+{{define "error"}}{{template "header" .}}<section class="card empty"><h2>Действие требует внимания</h2><p>После проверки состояния можно вернуться к работе.</p><a class="button" href="/panel/">Открыть обзор</a></section>{{template "footer" .}}{{end}}
+{{define "pager"}}<div class="pager"><span>Найдено: {{.Total}} · Страница {{.Page}} из {{.Pages}}</span><div>{{if .Previous}}<a class="button secondary" href="{{.Previous}}">← Назад</a>{{end}} {{if .Next}}<a class="button secondary" href="{{.Next}}">Далее →</a>{{end}}</div></div>{{end}}
+
+{{define "nodes-table"}}<div class="table-scroll"><table><thead><tr><th>Узел / группа</th><th>Состояние</th><th>Задано / применено</th><th>Последняя связь</th><th><span class="sr-only">Подробнее</span></th></tr></thead><tbody>
+{{range .Nodes}}<tr><td><a class="table-link" href="/panel/nodes/{{.NodeID}}">{{.NodeID}}</a><small>{{.Group}}</small></td><td><span class="badge {{.Tone}}">{{.Label}}</span></td><td class="mono">{{.Desired.Revision}} / {{if .Status}}{{.Status.AppliedRevision}}{{else}}—{{end}}</td><td class="subtle">{{stamp .LastSeen}}</td><td><a class="arrow" href="/panel/nodes/{{.NodeID}}" aria-label="Открыть {{.NodeID}}">↗</a></td></tr>
+{{else}}<tr><td colspan="5" class="empty">Узлов пока нет. Создайте приглашение или измените фильтр.</td></tr>{{end}}</tbody></table></div>{{end}}
+
+{{define "rollouts-table"}}<div class="table-scroll"><table><thead><tr><th>Обновление</th><th>Состояние</th><th>Текущий этап</th><th>Готово / всего</th><th>Создано</th></tr></thead><tbody>
+{{range .Rollouts}}<tr><td><a class="table-link" href="/panel/rollouts/{{.ID}}">{{.ID}}</a></td><td><span class="badge {{.Phase}}">{{phase .Phase}}</span></td><td>{{.StageName}}</td><td class="mono">{{.ReadyNodes}} / {{.TotalNodes}}</td><td class="subtle">{{stamp .CreatedAt}}</td></tr>
+{{else}}<tr><td colspan="5" class="empty">Обновлений пока нет. Подготовьте первый план rollout.</td></tr>{{end}}</tbody></table></div>{{end}}

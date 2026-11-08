@@ -31,7 +31,7 @@ func newFixture(t *testing.T) fixture {
 	}
 	f := fixture{root: root, output: filepath.Join(root, "build/acceptance/test"), trace: filepath.Join(root, "trace"), realGit: realGit}
 	f.checkout = filepath.Join(f.output, "repository")
-	for _, name := range []string{"identity.sh", "publish.sh", "run.sh", "sources.sh"} {
+	for _, name := range []string{"identity.sh", "publish.sh", "collect.sh", "run.sh", "sources.sh"} {
 		raw, err := os.ReadFile("../../../ops/testing/acceptance/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -71,6 +71,6 @@ func gitFixture(t *testing.T, f fixture, directory string) string {
 func (f fixture) command(script string, args ...string) *exec.Cmd {
 	command := exec.Command("bash", append([]string{filepath.Join(f.root, "ops/testing/acceptance", script)}, args...)...)
 	command.Dir = f.root
-	command.Env = append(os.Environ(), "CI_TEST_TRACE="+f.trace, "CI_TEST_GIT="+f.realGit, "PATH="+filepath.Join(f.root, "tools")+":"+os.Getenv("PATH"))
+	command.Env = append(os.Environ(), "CI_TEST_TRACE="+f.trace, "CI_TEST_GIT="+f.realGit, "CI_TEST_OUTPUT="+f.output, "PATH="+filepath.Join(f.root, "tools")+":"+os.Getenv("PATH"))
 	return command
 }

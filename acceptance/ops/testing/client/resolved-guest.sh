@@ -12,7 +12,7 @@ client_private_resolved() {
     mount -t tmpfs -o mode=0755 nhop-session-test /run/nhop-session-test
   fi
   chown systemd-resolve:systemd-resolve /run/systemd/resolve
-  if [[ "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == installed || "${1:-}" == protocols ]]; then client_private_config; fi
+  if [[ "${1:-}" == public || "${1:-}" == boot || "${1:-}" == systemd || "${1:-}" == installed || "${1:-}" == protocols ]]; then client_private_config; fi
   export DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/nhop-session-test/bus
   cat > /run/nhop-session-test/bus.conf <<'CONFIG'
 <busconfig><type>system</type><listen>unix:path=/run/nhop-session-test/bus</listen><auth>EXTERNAL</auth><policy context="default"><allow user="*"/><allow own="*"/><allow send_destination="*"/><allow receive_sender="*"/></policy></busconfig>

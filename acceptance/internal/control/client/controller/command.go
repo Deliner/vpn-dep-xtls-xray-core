@@ -9,6 +9,7 @@ import (
 	"net"
 	"time"
 
+	"vpn-script/internal/control/client/guard/bootstrap"
 	"vpn-script/internal/control/client/host"
 	"vpn-script/internal/control/client/session"
 )
@@ -81,12 +82,17 @@ func offline(ctx context.Context, operationName string) (Diagnostic, error) {
 	defer owner.Close()
 	directory, status, err := recorded(owner)
 	value := Diagnostic{Controller: "unavailable", Directory: directory, Status: status}
+	if err == nil {
+		state, inspectErr := bootstrap.Inspect(ctx)
+		value.Bootstrap, err = &state, inspectErr
+	}
 	if err != nil || operationName != "stop" {
 		return value, err
 	}
 	if directory == "" || status.Phase == "stopped" {
 		value.Controller, value.Status.Phase = "inactive", "stopped"
-		return value, nil
+		value.Bootstrap = &bootstrap.Status{Phase: "absent"}
+		return value, bootstrap.Release(ctx)
 	}
 	if err := host.Commands(); err != nil {
 		return value, err

@@ -7,6 +7,7 @@ source_root="$3"
 source "$(dirname "${BASH_SOURCE[0]}")/verify.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/verify-inputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/verify-protocols.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/verify-boot.sh"
 for arch in amd64 arm64; do
   report="$collection/client-linux-$arch"
   [[ "$(cat "$report/status")" == passed ]] || exit 1
@@ -21,6 +22,9 @@ for arch in amd64 arm64; do
     cmp "$report/$engine-SHA256SUMS" "$report/$engine-observed.sha256"
   done
   for policy in tunnel block; do
+    mode="$report/boot/$policy"
+    client_verify_inputs boot "$mode"
+    client_verify_boot "$mode" "$policy"
     mode="$report/$policy"
     client_verify_inputs public "$mode"
     client_verify_public "$mode" "$policy"

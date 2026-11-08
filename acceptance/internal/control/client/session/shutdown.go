@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"vpn-script/internal/control/client/guard"
+	"vpn-script/internal/control/client/guard/bootstrap"
 	"vpn-script/internal/control/client/network"
 	"vpn-script/internal/control/client/resolver"
 	"vpn-script/internal/control/client/routing"
@@ -90,7 +91,7 @@ func (s *Session) Wait(ctx context.Context) error {
 // retains protection and can be retried. It never removes another table/link.
 func (s *Session) Stop(ctx context.Context) error {
 	if s.status.Phase == "stopped" {
-		return nil
+		return bootstrap.Release(ctx)
 	}
 	if s.status.Guard.Handle == 0 {
 		if err := s.recoverProtection(ctx); err != nil {
@@ -101,6 +102,9 @@ func (s *Session) Stop(ctx context.Context) error {
 	s.group.stop()
 	if err = errors.Join(err, s.linkGone()); err == nil {
 		err = s.routes.Restore(ctx)
+	}
+	if err == nil {
+		err = bootstrap.Release(ctx)
 	}
 	if err == nil && s.status.Guard.Token != "" {
 		err = s.guard.Release(ctx, s.status.Guard)

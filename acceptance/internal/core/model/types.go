@@ -4,6 +4,7 @@ const Reality = "vless-reality"
 const Shadowsocks = "shadowsocks-2022"
 const SSMethod = "2022-blake3-aes-256-gcm"
 const ClientProfilesVersion = 2
+const MaxNodeConfigSize = 10_000_000
 
 type Definition struct {
 	Version int               `json:"version" yaml:"version"`

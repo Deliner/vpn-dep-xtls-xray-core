@@ -36,7 +36,7 @@ lab-payload xray singbox:
 # Package systemd acceptance, optionally including a trusted previous installer and its SHA-256.
 [group('lab')]
 lab-installer-package arch output previous='' sha256='':
-    bash ops/testing/linux/installer-package.sh "$1" "$2" "$3" "$4"
+    bash ops/testing/linux/installer/package.sh "$1" "$2" "$3" "$4"
 
 # Apply/update/roll back a real VPN service only inside the private Linux VM and clean it up.
 [group('lab')]

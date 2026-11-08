@@ -1,0 +1,13 @@
+{{define "nodes"}}{{template "header" .}}<p class="page-description">Фильтруйте машины по имени и группе. На странице — до 50 узлов.</p>
+<form class="filters" method="get" action="/panel/nodes"><label for="q">Имя узла<input id="q" name="q" value="{{.Query}}" placeholder="Найти узел"></label><label for="group">Группа<input id="group" name="group" value="{{.Group}}" placeholder="Все группы"></label><button type="submit">Найти</button><a href="/panel/nodes">Сбросить</a></form>
+<section class="card">{{template "nodes-table" .}}{{template "pager" .}}</section>{{template "footer" .}}{{end}}
+
+{{define "node"}}{{template "header" .}}<p class="page-description"><a href="/panel/nodes">← Все узлы</a> <span class="separator">/</span> {{.Node.Group}} <span class="badge {{.Node.Tone}}">{{.Node.Label}}</span></p>
+<section class="card padded"><h2>Конфигурация и связь</h2><dl class="facts"><div><dt>Флот</dt><dd>{{.Node.FleetID}}</dd></div><div><dt>Группа</dt><dd>{{.Node.Group}}</dd></div><div><dt>Заданная ревизия</dt><dd>{{.Node.Desired.Revision}}</dd></div><div><dt>Применённая ревизия</dt><dd>{{if .Node.Status}}{{.Node.Status.AppliedRevision}}{{else}}—{{end}}</dd></div>
+<div><dt>Последняя связь</dt><dd>{{stamp .Node.LastSeen}}</dd></div><div><dt>Новый результат применения</dt><dd>{{stamp .Node.StatusReceivedAt}}</dd></div><div class="wide"><dt>Заданное поколение</dt><dd class="mono">{{.Node.Desired.Generation}}</dd></div>
+{{if .Node.Status}}<div><dt>Результат агента</dt><dd>{{phase .Node.Status.Phase}}</dd></div><div><dt>Попытка агента</dt><dd>{{.Node.Status.Attempt}}</dd></div><div class="wide"><dt>Применённое поколение</dt><dd class="mono">{{.Node.Status.Generation}}</dd></div>{{end}}
+<div><dt>Задание действительно до</dt><dd>{{stamp .Node.Desired.ExpiresAt}}</dd></div></dl><a class="button" href="/panel/prepare">Подготовить конфигурацию</a></section>
+<p class="hint">Агент продлевает срок подписанного задания через pull. Ревизия может измениться при том же поколении конфигурации. Свежая связь сама по себе не доказывает прохождение VPN-трафика.</p>
+{{if not .Node.Revoked}}<details class="card padded danger-zone"><summary>Отозвать доступ узла к Fleet</summary><p>Узел перестанет получать задания и отправлять отчёты. Уже установленный VPN продолжит работать. Восстановление этой регистрации не предусмотрено.</p>
+<form method="post" action="/panel/nodes/{{.Node.NodeID}}/revoke">{{template "csrf" .}}<label class="check"><input type="checkbox" name="confirm" value="revoke" required> Подтверждаю отзыв доступа для {{.Node.NodeID}}</label><button class="danger" type="submit">Отозвать доступ</button></form></details>{{end}}
+{{template "footer" .}}{{end}}

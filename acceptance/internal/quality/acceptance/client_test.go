@@ -115,3 +115,44 @@ system DNS direct: direct=2->3 HTTPS=12->12
 --- PASS: TestKernelSystemdManagedRecovery (18.15s)
 PASS
 `
+
+func TestBootCollectorRejectsMissingTransitionsLeaksAndUnprovenCounters(t *testing.T) {
+	changes := map[string][2]string{
+		"valid": {"unused", "unused"}, "missing-case": {"/before ", "/omitted "},
+		"missing-observation": {"mode=after direct", "missing=after direct"},
+		"duplicate-phase":     {"mode=after", "mode=before"}, "unknown-phase": {"mode=after", "mode=unknown"},
+		"short-watch": {"attempts=200", "attempts=10"}, "leak": {"delivered=0", "delivered=1"},
+		"missing-DNS":  {"system DNS blocked:", "missing DNS blocked:"},
+		"wrong-policy": {"IPv6=tunnel", "IPv6=block"}, "failed-root": {"--- PASS: TestKernelBootProtectionHandoff (", "--- FAIL: TestKernelBootProtectionHandoff ("},
+	}
+	for name, change := range changes {
+		t.Run(name, func(t *testing.T) {
+			directory := t.TempDir()
+			log := strings.ReplaceAll(bootEvidence(), change[0], change[1])
+			write(t, filepath.Join(directory, "guest.log"), log, 0600)
+			command := exec.Command("bash", "-c", `set -euo pipefail; source "${1%/*}/verify.sh"; source "$1"; if client_verify_boot "$2" tunnel; then exit 0; else exit 1; fi`,
+				"fixture", "../../../ops/testing/acceptance/client/verify-boot.sh", directory)
+			output, err := command.CombinedOutput()
+			if (err == nil) != (name == "valid") {
+				t.Fatalf("bootstrap evidence mismatch %s: %v %s", name, err, output)
+			}
+		})
+	}
+}
+
+func bootEvidence() string {
+	var log strings.Builder
+	log.WriteString("bootstrap policy: IPv6=tunnel\n")
+	for _, mode := range []string{"stop", "handoff", "before", "after"} {
+		fmt.Fprintf(&log, "--- PASS: TestKernelBootProtectionHandoff/%s (1s)\nbootstrap mode=%s direct UDP: attempts=200 delivered=0\n", mode, mode)
+	}
+	for i := range 8 {
+		fmt.Fprintf(&log, "system DNS direct: direct=%d->%d HTTPS=0->0\n", i, i+1)
+	}
+	log.WriteString("system DNS tunnel: direct=8->8 HTTPS=0->1\n")
+	for range 4 {
+		log.WriteString("system DNS blocked: direct=8->8 HTTPS=1->1\n")
+	}
+	log.WriteString("--- PASS: TestKernelBootProtectionHandoff (8s)\nPASS\n")
+	return log.String()
+}

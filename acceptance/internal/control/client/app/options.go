@@ -48,7 +48,7 @@ func (value *options) flags(command string, flags *flag.FlagSet) error {
 			flags.StringVar(&value.binary, "binary", "", "absolute installed Linux client executable path")
 			flags.StringVar(&value.output, "output", "", "new service unit file; does not install or activate")
 		}
-	case "diagnostics", "stop", "reconnect", "resume", "service-prepare", "service-remove":
+	case "diagnostics", "stop", "reconnect", "resume", "service-prepare", "service-remove", "boot-protect":
 	default:
 		return fmt.Errorf("unknown client command")
 	}

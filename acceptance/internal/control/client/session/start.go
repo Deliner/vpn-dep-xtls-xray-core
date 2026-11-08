@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"vpn-script/internal/control/client/guard"
+	"vpn-script/internal/control/client/guard/bootstrap"
 	"vpn-script/internal/control/client/resolver"
 	"vpn-script/internal/control/client/routing"
 )
@@ -71,6 +72,9 @@ func (s *Session) protect(ctx context.Context) error {
 }
 
 func (s *Session) launch(ctx context.Context) error {
+	if err := bootstrap.Handoff(ctx, s.status.Guard); err != nil {
+		return err
+	}
 	var err error
 	s.status.NativePID, err = s.group.start(s.request, "native", s.request.Profile.Metadata.Engine, true)
 	if err != nil {

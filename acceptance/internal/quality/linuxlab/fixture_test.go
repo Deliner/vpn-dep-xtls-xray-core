@@ -21,7 +21,7 @@ func newFixture(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	f := fixture{root: root, output: filepath.Join(root, "build/package"), trace: filepath.Join(root, "trace")}
-	for _, script := range []string{"testing/linux/package.sh", "testing/linux/package-common.sh", "testing/linux/installer-package.sh", "runtime/integrity.sh"} {
+	for _, script := range []string{"testing/linux/package.sh", "testing/linux/package-common.sh", "testing/linux/installer/package.sh", "runtime/integrity.sh"} {
 		data, err := os.ReadFile("../../../ops/" + script)
 		if err != nil {
 			t.Fatal(err)
@@ -87,7 +87,7 @@ func (f fixture) command() *exec.Cmd {
 
 func (f fixture) installerCommand() *exec.Cmd {
 	command := f.command()
-	command.Args = []string{"bash", filepath.Join(f.root, "ops/testing/linux/installer-package.sh"), "arm64", f.output}
+	command.Args = []string{"bash", filepath.Join(f.root, "ops/testing/linux/installer/package.sh"), "arm64", f.output}
 	return command
 }
 

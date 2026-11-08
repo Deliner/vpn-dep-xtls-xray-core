@@ -10,6 +10,7 @@ import (
 )
 
 const Table = "nhop_client"
+const BootTable = "nhop_client_boot"
 const IPv4 = "172.30.255.1/30"
 const IPv6 = "fdfe:dcba:9876::1/126"
 const DNS = "172.30.255.2"

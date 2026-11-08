@@ -13,6 +13,9 @@ import (
 func control(command string, value options, output io.Writer) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	if command == "boot-protect" {
+		return controller.ProtectBoot(ctx, output)
+	}
 	if command == "service-prepare" {
 		return controller.PrepareService()
 	}

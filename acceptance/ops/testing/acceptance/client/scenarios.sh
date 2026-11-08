@@ -6,6 +6,7 @@ client_scenario() {
   if [[ "$kind" == systemd ]]; then mode="$report/service/$policy"; fi
   if [[ "$kind" == protocols ]]; then mode="$report/protocols/$policy"; fi
   if [[ "$kind" == installed ]]; then mode="$report/installed/$policy"; fi
+  if [[ "$kind" == boot ]]; then mode="$report/boot/$policy"; fi
   mkdir -m 0700 "$mode" "$mode/bin"
   cp "$report/network.test" "$mode/network.test"
   cp ops/testing/client/kernel-guest.sh "$mode/guest.sh"

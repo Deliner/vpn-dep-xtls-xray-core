@@ -17,7 +17,8 @@ files=(.gitignore AGENTS.md README.md go.mod go.sum justfile .github/workflows/g
 
 while IFS= read -r -d '' source; do
   files+=("${source#"$repo_root/"}")
-done < <(find "$repo_root/cmd" "$repo_root/internal" -type f -name '*.go' -print0)
+# Embedded HTML/CSS are executable build inputs, just like their Go owners.
+done < <(find "$repo_root/cmd" "$repo_root/internal" -type f \( -name '*.go' -o -name '*.html' -o -name '*.css' \) -print0)
 while IFS= read -r -d '' source; do
   files+=("${source#"$repo_root/"}")
 done < <(find "$repo_root/docs" -type f -name '*.md' ! -name '*.local.md' -print0)

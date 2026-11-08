@@ -1,0 +1,8 @@
+{{define "enroll"}}{{template "header" .}}<p class="page-description">Создайте приглашение и передайте bootstrap-файл на нужную Linux-машину.</p>
+<div class="form-grid"><section class="card padded"><h2>Приглашение на регистрацию</h2><form method="post" action="/panel/enroll" enctype="multipart/form-data">{{template "csrf" .}}
+<label for="node">Имя узла</label><input id="node" name="node" required maxlength="63" placeholder="exit-ams-01">
+<label for="group">Группа</label><input id="group" name="group" required maxlength="63" value="main">
+<label for="validity">Срок приглашения</label><select id="validity" name="validity"><option value="3600">1 час</option><option value="600">10 минут</option><option value="86400">24 часа</option></select>
+<label for="ca">CA контроллера, если используется частный сертификат</label><input id="ca" name="ca" type="file" accept=".pem,.crt"><p class="hint">Для публичного сертификата оставьте пустым. CA должен подтверждать HTTPS-адрес, открытый в браузере.</p>
+<button type="submit">Создать и скачать bootstrap ↓</button></form></section><aside class="card padded instructions"><span class="step">01 / ПОДКЛЮЧЕНИЕ</span><h2>Регистрация через исходящий HTTPS</h2><p>После скачивания ограничьте доступ к bootstrap-файлу правами <code>0600</code> и передайте его на сервер по защищённому каналу.</p><p>Инициализируйте агент командой <code>just fleet-agent-init</code>, затем установите и запустите его службу.</p><div class="notice"><b>Повторное приглашение</b><p>Для ещё не зарегистрированного имени новое приглашение заменяет предыдущее. Для уже зарегистрированного или отозванного узла создание отклоняется.</p></div></aside></div>
+{{template "footer" .}}{{end}}

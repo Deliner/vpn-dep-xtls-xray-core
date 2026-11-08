@@ -1,0 +1,127 @@
+--- a/tuic/service.go
++++ b/tuic/service.go
+@@ -13,7 +13,6 @@
+ 
+ 	"github.com/sagernet/quic-go"
+ 	qtls "github.com/sagernet/sing-quic"
+-	"github.com/sagernet/sing/common"
+ 	"github.com/sagernet/sing/common/auth"
+ 	"github.com/sagernet/sing/common/buf"
+ 	"github.com/sagernet/sing/common/bufio"
+@@ -57,7 +56,9 @@
+ 	udpTimeout        time.Duration
+ 	handler           ServiceHandler
+ 
+-	quicListener io.Closer
++	listenerAccess sync.Mutex
++	quicListener   *serverListener
++	stopped        bool
+ }
+ 
+ func NewService[U comparable](options ServiceOptions) (*Service[U], error) {
+@@ -109,54 +110,54 @@
+ }
+ 
+ func (s *Service[U]) Start(conn net.PacketConn) error {
+-	if !s.quicConfig.Allow0RTT {
+-		listener, err := qtls.Listen(conn, s.tlsConfig, s.quicConfig)
+-		if err != nil {
+-			return err
+-		}
+-		s.quicListener = listener
+-		go func() {
+-			for {
+-				connection, hErr := listener.Accept(s.ctx)
+-				if hErr != nil {
+-					if E.IsClosedOrCanceled(hErr) || errors.Is(hErr, quic.ErrServerClosed) {
+-						s.logger.Debug(E.Cause(hErr, "listener closed"))
+-					} else {
+-						s.logger.Error(E.Cause(hErr, "listener closed"))
+-					}
+-					return
+-				}
+-				go s.handleConnection(connection)
+-			}
+-		}()
++	s.listenerAccess.Lock()
++	defer s.listenerAccess.Unlock()
++	if s.stopped {
++		return net.ErrClosed
++	}
++	if s.quicListener != nil {
++		return E.New("TUIC service already started")
++	}
++	var listener qtls.Listener
++	var err error
++	if s.quicConfig.Allow0RTT {
++		listener, err = qtls.ListenEarly(conn, s.tlsConfig, s.quicConfig)
+ 	} else {
+-		listener, err := qtls.ListenEarly(conn, s.tlsConfig, s.quicConfig)
+-		if err != nil {
+-			return err
+-		}
+-		s.quicListener = listener
+-		go func() {
+-			for {
+-				connection, hErr := listener.Accept(s.ctx)
+-				if hErr != nil {
+-					if E.IsClosedOrCanceled(hErr) || errors.Is(hErr, quic.ErrServerClosed) {
+-						s.logger.Debug(E.Cause(hErr, "listener closed"))
+-					} else {
+-						s.logger.Error(E.Cause(hErr, "listener closed"))
+-					}
+-					return
+-				}
+-				go s.handleConnection(connection)
+-			}
+-		}()
+-	}
++		listener, err = qtls.Listen(conn, s.tlsConfig, s.quicConfig)
++	}
++	if err != nil {
++		return err
++	}
++	s.quicListener = newServerListener(listener)
++	go s.loopConnections(s.quicListener)
+ 	return nil
+ }
+ 
++func (s *Service[U]) loopConnections(listener *serverListener) {
++	defer close(listener.acceptDone)
++	for {
++		connection, err := listener.Accept(s.ctx)
++		if err != nil {
++			if E.IsClosedOrCanceled(err) || errors.Is(err, quic.ErrServerClosed) {
++				s.logger.Debug(E.Cause(err, "listener closed"))
++			} else {
++				s.logger.Error(E.Cause(err, "listener closed"))
++			}
++			return
++		}
++		go s.handleConnection(connection)
++	}
++}
++
+ func (s *Service[U]) Close() error {
+-	return common.Close(
+-		s.quicListener,
+-	)
++	s.listenerAccess.Lock()
++	s.stopped = true
++	listener := s.quicListener
++	s.listenerAccess.Unlock()
++	if listener == nil {
++		return nil
++	}
++	return listener.Close()
+ }
+ 
+ func (s *Service[U]) handleConnection(connection *quic.Conn) {
+@@ -406,6 +407,7 @@
+ 		udpConn.closeWithError(err)
+ 	}
+ 	_ = s.quicConn.CloseWithError(0, "")
++	s.quicListener.release(s.quicConn)
+ }
+ 
+ type serverConn struct {

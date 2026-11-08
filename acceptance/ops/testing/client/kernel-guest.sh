@@ -13,6 +13,7 @@ case "${1:-policy}" in
   resolver) pattern='^TestKernelResolvedPrivateLinkLifecycle$' ;;
   session) pattern='^TestKernelSessionStartStopAndFailures$' ;;
   public) pattern='^TestKernelPublicClientAndControllerRecovery$' ;;
+  boot) pattern='^TestKernelBootProtectionHandoff$'; export NHOP_CLIENT_BOOT_TEST=private-netns ;;
   systemd) pattern='^TestKernelSystemdManagedRecovery$' ;;
   protocols) pattern='^TestKernelAllProtocolTUN$' ;;
   installed) pattern='^TestKernelInstalledServiceManagedRecovery$'; export NHOP_CLIENT_INSTALLED_TEST=private-netns ;;
@@ -67,13 +68,13 @@ if [[ "${1:-}" == resolver ]]; then
   ip link set nhopdns up
   export NHOP_CLIENT_RESOLVED_TEST=private-netns
 fi
-if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == installed || "${1:-}" == protocols ]]; then
+if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == boot || "${1:-}" == systemd || "${1:-}" == installed || "${1:-}" == protocols ]]; then
   if [[ "${1:-}" == systemd || "${1:-}" == installed ]]; then source ./systemd-guest.sh; fi
   if [[ "${1:-}" == installed ]]; then source ./installed-guest.sh; fi
   source ./resolved-guest.sh
   client_private_resolved "$1"
 fi
-if [[ "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == installed || "${1:-}" == protocols ]]; then
+if [[ "${1:-}" == public || "${1:-}" == boot || "${1:-}" == systemd || "${1:-}" == installed || "${1:-}" == protocols ]]; then
   ip netns exec nhop-client-inner resolvectl dns client 198.51.100.7
   ip netns exec nhop-client-inner resolvectl default-route client yes
   ip netns exec nhop-client-inner resolvectl dnsovertls client no
@@ -86,7 +87,7 @@ if [[ "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == installed || "${1
     mount -t tmpfs -o mode=0711 nhop-client-control-test /run/nhop-client
   fi
   export NHOP_CLIENT_PUBLIC_TEST=private-netns
-  if [[ "${1:-}" == public ]]; then export NHOP_CLIENT_BINARY="$PWD/bin/nhop-client"; fi
+  if [[ "${1:-}" == public || "${1:-}" == boot ]]; then export NHOP_CLIENT_BINARY="$PWD/bin/nhop-client"; fi
 fi
 if [[ "${1:-}" == systemd || "${1:-}" == installed ]]; then
   client_systemd_prepare
@@ -107,9 +108,9 @@ if [[ "${1:-}" == protocols ]]; then
 fi
 NHOP_CLIENT_KERNEL_TEST=private-netns NHOP_CLIENT_RUNTIME="$PWD/bin" ./network.test \
   -test.run "$pattern" -test.v -test.timeout="$test_timeout"
-case "${1:-}" in resolver|session|public|systemd|protocols|install|installed) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
+case "${1:-}" in resolver|session|public|boot|systemd|protocols|install|installed) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
 if [[ "${1:-}" == install || "${1:-}" == installed ]]; then
   [[ ! -e /var/lib/nhop-client && ! -L /var/lib/nhop-client ]]
   [[ ! -e /etc/systemd/system/nhop-client.service && ! -L /etc/systemd/system/nhop-client.service ]]
 fi
-if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == systemd || "${1:-}" == installed || "${1:-}" == protocols ]]; then cat bus.log resolved.log; fi
+if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == boot || "${1:-}" == systemd || "${1:-}" == installed || "${1:-}" == protocols ]]; then cat bus.log resolved.log; fi

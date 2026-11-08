@@ -48,6 +48,16 @@ client-service-run profile runtimes ipv6='tunnel':
 client-service-prepare:
     ./build/bin/nhop-client service-prepare
 
+# MUTATES LINUX CLIENT NETWORK: retain offline egress protection before any session or network configuration.
+[group('client')]
+client-boot-protect:
+    ./build/bin/nhop-client boot-protect
+
+# Test retained early protection and gap-free handoff to the real TUN client only in the owned Linux VM.
+[group('client')]
+client-boot-test xray singbox ipv6='tunnel':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/boot.sh "$1" "$2" "$3"
+
 # Show credential-free local session status; unavailable controllers are explicitly labelled.
 [group('client')]
 client-diagnostics:

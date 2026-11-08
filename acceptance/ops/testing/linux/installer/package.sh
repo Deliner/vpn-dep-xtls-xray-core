@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
 source "$root/ops/testing/linux/package-common.sh"
 [[ $# == 2 || $# == 4 ]] || exit 2
 package_begin "$1" "$2"
@@ -24,5 +24,5 @@ GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOWORK=off go test -c -trimpath -buildvc
 GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOWORK=off go test -c -trimpath -buildvcs=false \
   -ldflags=-buildid= -o "$bundle/node.test" "$root/cmd/nhop-node"
 package_test
-cp "$root/ops/testing/linux/installer-guest.sh" "$bundle/guest.sh"
+cp "$root/ops/testing/linux/installer/guest.sh" "$bundle/guest.sh"
 package_seal installer

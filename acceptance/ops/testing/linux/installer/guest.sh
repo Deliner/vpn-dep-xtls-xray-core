@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Explicit systemd acceptance in the owned VM; never used by ordinary payload/check.
+# Explicit node systemd acceptance in the owned VM; never used by ordinary payload/check.
 set -euo pipefail
 umask 077
 [[ "$(uname -s)" == Linux && "$(hostname)" == lima-payload && -d /run/systemd/system ]] || exit 2

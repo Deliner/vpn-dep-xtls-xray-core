@@ -27,7 +27,7 @@ package_seal() {
     git -C "$root" rev-parse HEAD
     git -C "$root" status --porcelain --untracked-files=normal
   } > "$bundle/provenance.txt"
-  (cd "$root"; find cmd internal -type f -name '*.go' -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256; shasum -a 256 go.mod go.sum ops/testing/linux/*.sh) > "$bundle/source.sha256"
+  (cd "$root"; find cmd internal -type f \( -name '*.go' -o -name '*.html' -o -name '*.css' \) -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256; shasum -a 256 go.mod go.sum; find ops/testing/linux -type f -name '*.sh' -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) > "$bundle/source.sha256"
   (cd "$bundle"; find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) > "$output/SHA256SUMS"
   cp "$output/SHA256SUMS" "$bundle/SHA256SUMS"
   COPYFILE_DISABLE=1 tar -czf "$output/payload.tar.gz" -C "$output" payload

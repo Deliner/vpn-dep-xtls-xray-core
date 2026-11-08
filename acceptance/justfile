@@ -20,6 +20,7 @@ import 'ops/tasks/legacy.just'
 import 'ops/tasks/dependencies.just'
 import 'ops/tasks/acceptance.just'
 import 'ops/tasks/client.just'
+import 'ops/tasks/fleet.just'
 
 # Show all project commands, grouped by responsibility.
 default:

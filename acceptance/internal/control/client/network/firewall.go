@@ -18,10 +18,7 @@ func Firewall(imported profile.Imported, options Options) (string, error) {
 	fmt.Fprintf(&body, "table inet %s {\n chain output {\n  type filter hook output priority 50; policy drop;\n", Table)
 	fmt.Fprintln(&body, "  oifname \"lo\" accept")
 	writeEntry(&body, imported, options)
-	// IPv6 link discovery maintains the outer network, including IPv6 VPN entries.
-	fmt.Fprintln(&body, "  ip6 hoplimit 255 icmpv6 type { nd-router-solicit, nd-neighbor-solicit, nd-neighbor-advert } accept")
-	fmt.Fprintln(&body, "  meta skuid 0 ip daddr 255.255.255.255 udp sport 68 udp dport 67 accept")
-	fmt.Fprintln(&body, "  meta skuid 0 ip6 daddr ff02::1:2 udp sport 546 udp dport 547 accept")
+	writeLinkControl(&body)
 	if options.IPv6 == "block" {
 		fmt.Fprintln(&body, "  meta nfproto ipv6 counter drop")
 	}
@@ -29,6 +26,24 @@ func Firewall(imported profile.Imported, options Options) (string, error) {
 	fmt.Fprintln(&body, " chain forward {\n  type filter hook forward priority 50; policy drop;\n }")
 	fmt.Fprintln(&body, "}")
 	return body.String(), nil
+}
+
+// BootFirewall needs no profile, account lookup, route, DNS or TUN. It keeps
+// application egress closed while the outer interface is being configured.
+func BootFirewall() string {
+	var body strings.Builder
+	fmt.Fprintf(&body, "table inet %s {\n chain output {\n  type filter hook output priority 50; policy drop;\n", BootTable)
+	fmt.Fprintln(&body, "  oifname \"lo\" accept")
+	writeLinkControl(&body)
+	fmt.Fprintln(&body, "  counter drop\n }\n chain forward {\n  type filter hook forward priority 50; policy drop;\n }\n}")
+	return body.String()
+}
+
+func writeLinkControl(body *strings.Builder) {
+	// IPv6 link discovery maintains the outer network, including IPv6 VPN entries.
+	fmt.Fprintln(body, "  ip6 hoplimit 255 icmpv6 type { nd-router-solicit, nd-neighbor-solicit, nd-neighbor-advert } accept")
+	fmt.Fprintln(body, "  meta skuid 0 ip daddr 255.255.255.255 udp sport 68 udp dport 67 accept")
+	fmt.Fprintln(body, "  meta skuid 0 ip6 daddr ff02::1:2 udp sport 546 udp dport 547 accept")
 }
 
 func writeEntry(body *strings.Builder, imported profile.Imported, options Options) {

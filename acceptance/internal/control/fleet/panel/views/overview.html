@@ -1,0 +1,10 @@
+{{define "overview"}}{{template "header" .}}
+<p class="page-description">Конфигурации, состояние узлов и ход обновлений — в одном месте.</p>
+<section class="metrics" aria-label="Сводка"><article class="metric"><span>Всего узлов</span><strong>{{.Total}}</strong><small>Во всех группах</small></article>
+<article class="metric"><span>Конфигурация применена</span><strong>{{.Recent}}<i class="good-dot"></i></strong><small>Есть связь за последние 90 с</small></article>
+<article class="metric"><span>Требуют внимания</span><strong>{{.Attention}}</strong><small>Ожидание, ошибка или нет связи</small></article>
+<article class="metric accent"><span>Активные обновления</span><strong>{{.Active}}</strong><small>Поэтапное применение</small></article></section>
+<section class="card"><div class="card-heading"><div><h2>Узлы флота</h2><p>Первый срез зарегистрированных машин</p></div><a href="/panel/nodes">Все узлы →</a></div>{{template "nodes-table" .}}</section>
+<section class="card"><div class="card-heading"><div><h2>Последние обновления</h2><p>Новая группа запускается после проверки предыдущей</p></div><a href="/panel/rollouts">Все обновления →</a></div>{{template "rollouts-table" .}}</section>
+<aside class="notice"><b>Что означает состояние</b><p>«Применён» — агент сообщил об установке заданного поколения. Это не проверка доступности VPN из интернета или выходного IP.</p></aside>
+{{template "footer" .}}{{end}}

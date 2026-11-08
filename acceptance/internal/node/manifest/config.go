@@ -11,14 +11,6 @@ import (
 	"vpn-script/internal/runtime/xray"
 )
 
-func Load(path string) (model.NodeConfig, error) {
-	var data model.NodeConfig
-	if err := safeio.LoadJSON(path, &data); err != nil {
-		return data, err
-	}
-	return data, Validate(data)
-}
-
 func Validate(data model.NodeConfig) error {
 	if (data.SchemaVersion != 1 && data.SchemaVersion != 2) || validate.Name(data.NodeID) != nil || validate.Name(data.TopologyID) != nil {
 		return fmt.Errorf("invalid node identity/schema")

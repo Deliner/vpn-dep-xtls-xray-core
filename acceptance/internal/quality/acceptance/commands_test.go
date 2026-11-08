@@ -37,6 +37,12 @@ case "$*" in
     printf 'disabled_fork\t.github/workflows/other.yml\n' ;;
   'api --hostname github.com --method PUT '*'/workflows/101/enable') ;;
   'api --hostname github.com --method PUT '*'/workflows/303/enable') ;;
+  'run view 42 --repo Deliner/vpn-dep-xtls-xray-core --json databaseId,'*)
+    printf '{"databaseId":42}\n' ;;
+  'run view 42 --repo Deliner/vpn-dep-xtls-xray-core --json headSha,headBranch,status,event --jq '*)
+    printf '%s\tnhop-acceptance\t%s\tpush\n' "${CI_TEST_RUN_SHA:-$(cat "$CI_TEST_OUTPUT/prepared.commit")}" "${CI_TEST_RUN_STATE:-completed}" ;;
+  'run download 42 --repo Deliner/vpn-dep-xtls-xray-core --dir '*)
+    printf 'Artifact download unavailable\n' >&2; exit 44 ;;
   *) printf 'Unexpected test API request\n' >&2; exit 2 ;;
 esac
 `

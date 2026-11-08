@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"time"
-
-	"vpn-script/internal/control/client/network"
 )
 
 type listing struct {
@@ -46,7 +44,7 @@ func (m *Manager) Verify(ctx context.Context, lease Lease) error {
 		return fmt.Errorf("cannot prove client firewall is absent")
 	}
 	for _, item := range value.NFTables {
-		if item.Table != nil && item.Table.Family == "inet" && item.Table.Name == network.Table {
+		if item.Table != nil && item.Table.Family == "inet" && item.Table.Name == m.tableName() {
 			return fmt.Errorf("unrecorded client firewall exists; inspect before recovery")
 		}
 	}
@@ -54,7 +52,7 @@ func (m *Manager) Verify(ctx context.Context, lease Lease) error {
 }
 
 func (m *Manager) verifyProtection(ctx context.Context) error {
-	result, err := m.run(ctx, 5*time.Second, "nft", "--json", "list", "table", "inet", network.Table)
+	result, err := m.run(ctx, 5*time.Second, "nft", "--json", "list", "table", "inet", m.tableName())
 	var value listing
 	if err != nil || !result.Success || json.Unmarshal(result.Output, &value) != nil {
 		return fmt.Errorf("could not verify installed firewall policy; client must not start")
@@ -62,7 +60,7 @@ func (m *Manager) verifyProtection(ctx context.Context) error {
 	seen := map[string]bool{}
 	for _, item := range value.NFTables {
 		c := item.Chain
-		if c != nil && c.Family == "inet" && c.Table == network.Table && c.Type == "filter" && c.Prio == 50 && c.Policy == "drop" && c.Hook == c.Name {
+		if c != nil && c.Family == "inet" && c.Table == m.tableName() && c.Type == "filter" && c.Prio == 50 && c.Policy == "drop" && c.Hook == c.Name {
 			seen[c.Name] = true
 		}
 	}
@@ -73,7 +71,7 @@ func (m *Manager) verifyProtection(ctx context.Context) error {
 }
 
 func (m *Manager) inspect(ctx context.Context) (Lease, error) {
-	result, err := m.run(ctx, 5*time.Second, "nft", "--json", "--handle", "list", "table", "inet", network.Table)
+	result, err := m.run(ctx, 5*time.Second, "nft", "--json", "--handle", "list", "table", "inet", m.tableName())
 	if err != nil || !result.Success {
 		return Lease{}, fmt.Errorf("cannot inspect client kill switch")
 	}
@@ -83,7 +81,7 @@ func (m *Manager) inspect(ctx context.Context) (Lease, error) {
 	}
 	var matches []Lease
 	for _, item := range value.NFTables {
-		if table := item.Table; table != nil && table.Name == network.Table && table.Family == "inet" {
+		if table := item.Table; table != nil && table.Name == m.tableName() && table.Family == "inet" {
 			matches = append(matches, Lease{Token: table.Comment, Handle: table.Handle})
 		}
 	}

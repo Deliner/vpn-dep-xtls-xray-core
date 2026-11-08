@@ -1,0 +1,79 @@
+diff --git a/tuic/server_listener.go b/tuic/server_listener.go
+new file mode 100644
+--- /dev/null
++++ b/tuic/server_listener.go
+@@ -0,0 +1,74 @@
++package tuic
++
++import (
++	"context"
++	"sync"
++
++	"github.com/sagernet/quic-go"
++	qtls "github.com/sagernet/sing-quic"
++)
++
++// serverListener owns accepted connections until their QUIC close has completed.
++// Closing the listener alone leaves those connections alive on the caller's socket.
++type serverListener struct {
++	qtls.Listener
++	mu         sync.Mutex
++	peers      map[*quic.Conn]struct{}
++	acceptDone chan struct{}
++	closeOnce  sync.Once
++	closeErr   error
++}
++
++func newServerListener(listener qtls.Listener) *serverListener {
++	return &serverListener{
++		Listener: listener, peers: make(map[*quic.Conn]struct{}),
++		acceptDone: make(chan struct{}),
++	}
++}
++
++func (l *serverListener) Accept(ctx context.Context) (*quic.Conn, error) {
++	conn, err := l.Listener.Accept(ctx)
++	if err != nil {
++		return nil, err
++	}
++	l.mu.Lock()
++	l.peers[conn] = struct{}{}
++	l.mu.Unlock()
++	return conn, nil
++}
++
++func (l *serverListener) release(conn *quic.Conn) {
++	l.mu.Lock()
++	delete(l.peers, conn)
++	l.mu.Unlock()
++}
++
++func (l *serverListener) Close() error {
++	l.closeOnce.Do(func() {
++		l.closeErr = l.Listener.Close()
++		// Accept may already have returned a connection. Wait until it has
++		// been registered before taking the final snapshot.
++		<-l.acceptDone
++		l.closePeers()
++	})
++	return l.closeErr
++}
++
++func (l *serverListener) closePeers() {
++	l.mu.Lock()
++	peers := make([]*quic.Conn, 0, len(l.peers))
++	for peer := range l.peers {
++		peers = append(peers, peer)
++	}
++	l.mu.Unlock()
++	var pending sync.WaitGroup
++	for _, peer := range peers {
++		pending.Go(func() {
++			// Wait for the connection loop to attempt sending CONNECTION_CLOSE.
++			// Do not hold mu: the session can concurrently release this peer.
++			_ = peer.CloseWithError(0, "")
++			l.release(peer)
++		})
++	}
++	pending.Wait()
++}

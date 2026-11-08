@@ -6,9 +6,100 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"vpn-script/internal/core/dag"
 )
+
+func TestKernelBootProtectionHandoff(t *testing.T) {
+	if os.Getenv("NHOP_CLIENT_BOOT_TEST") != "private-netns" || os.Getenv("NHOP_CLIENT_BINARY") == "" {
+		t.Skip("requires isolated Linux namespaces and the real public CLI binary")
+	}
+	checkIsolation(t)
+	t.Logf("bootstrap policy: IPv6=%s", os.Getenv("NHOP_CLIENT_IPV6"))
+	origin(t, "198.18.0.2:18080")
+	origin(t, "[2001:db8:feed::2]:18080")
+	udpOrigin(t)
+	dns := startDNSOrigins(t)
+	for _, mode := range []string{"stop", "handoff", "before", "after"} {
+		t.Run(mode, func(t *testing.T) { bootLifecycle(t, mode, dns) })
+	}
+}
+
+func bootLifecycle(t *testing.T, mode string, dns *dnsOrigins) {
+	t.Helper()
+	request := fixture(t)
+	probe, initial := newController(t, request)
+	profile, runtimes := cliInputs(t, request)
+	canary := directCanary(t)
+	checkSystemDNS(t, probe, dns, "direct")
+	protected := cliCall(t, "boot-protect")
+	if protected.Bootstrap == nil || protected.Bootstrap.Phase != "protected" || protected.Bootstrap.Guard.Handle == 0 {
+		t.Fatal("early protection was not verified", protected)
+	}
+	t.Cleanup(func() { cliCall(t, "stop") })
+	repeated := cliCall(t, "boot-protect")
+	if repeated.Bootstrap == nil || repeated.Bootstrap.Guard != protected.Bootstrap.Guard {
+		t.Fatal("repeated boot activation replaced the guard")
+	}
+	watch := startLeakWatch(t)
+	checkTraffic(t, probe, false)
+	checkSystemDNS(t, probe, dns, "blocked")
+	time.Sleep(100 * time.Millisecond)
+	done := bootTransition(t, probe, mode, profile, runtimes, dns)
+	watch.stop(t)
+	verifyBootLeak(t, mode, watch.attempts, canary.Load())
+	finishBoot(t, probe, initial, done, mode == "handoff", dns)
+}
+
+func bootTransition(t *testing.T, probe *controller, mode, profile, runtimes string, dns *dnsOrigins) <-chan error {
+	t.Helper()
+	if mode == "before" || mode == "after" {
+		crashed := crashGuard(t, profile, runtimes, mode)
+		if crashed.Bootstrap == nil || crashed.Bootstrap.Phase != "protected" {
+			t.Fatal("crash lost bootstrap protection", crashed)
+		}
+	}
+	if mode != "handoff" {
+		return nil
+	}
+	_, done, started := cliStart(t, profile, runtimes)
+	if started.Error != "" || started.Status.Phase != "running" {
+		t.Fatal("boot-to-session handoff failed", started)
+	}
+	activeTraffic(t, probe)
+	checkSystemDNS(t, probe, dns, "tunnel")
+	return done
+}
+
+func verifyBootLeak(t *testing.T, mode string, attempts, delivered uint64) {
+	t.Helper()
+	if attempts < 20 || delivered != 0 {
+		t.Fatalf("bootstrap continuous leak control: attempts=%d delivered=%d", attempts, delivered)
+	}
+	t.Logf("bootstrap mode=%s direct UDP: attempts=%d delivered=0", mode, attempts)
+}
+
+func finishBoot(t *testing.T, probe *controller, initial response, done <-chan error, handoff bool, dns *dnsOrigins) {
+	t.Helper()
+	if handoff {
+		finishPublic(t, probe, initial, done, "graceful", dns)
+	} else {
+		result := cliCall(t, "stop")
+		if result.Status.Phase != "stopped" {
+			t.Fatal("explicit stop did not release early protection", result)
+		}
+		checkTraffic(t, probe, true)
+		checkSystemDNS(t, probe, dns, "direct")
+	}
+	status := cliCall(t, "diagnostics")
+	if status.Bootstrap == nil || status.Bootstrap.Phase != "absent" {
+		t.Fatal("explicit stop retained early protection", status)
+	}
+	if result := probe.call(t, "probe-direct"); result.Error != "" {
+		t.Fatal("positive direct control failed after explicit stop", result)
+	}
+}
 
 func TestKernelSessionStartStopAndFailures(t *testing.T) {
 	if os.Getenv("NHOP_CLIENT_KERNEL_TEST") != "private-netns" || os.Getenv("NHOP_CLIENT_RUNTIME") == "" {

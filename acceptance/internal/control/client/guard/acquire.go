@@ -18,7 +18,7 @@ func (m *Manager) Acquire(ctx context.Context, value profile.Imported, options n
 // AcquireReserved applies a previously persisted intention with the same
 // exclusive transaction as Acquire. It never replaces an existing table.
 func (m *Manager) AcquireReserved(ctx context.Context, value profile.Imported, options network.Options, lease Lease) (Lease, error) {
-	if lease.Handle != 0 || !tokenPattern.MatchString(lease.Token) {
+	if m.bootstrap || lease.Handle != 0 || !tokenPattern.MatchString(lease.Token) {
 		return Lease{}, fmt.Errorf("firewall acquisition requires a reserved identity without a handle")
 	}
 	policy, err := network.Firewall(value, options)
@@ -27,7 +27,16 @@ func (m *Manager) AcquireReserved(ctx context.Context, value profile.Imported, o
 	}
 	// nft's create-table operation ignores nested chain/rule declarations. Use
 	// an exclusive empty table followed by the full policy in ONE transaction.
-	policy = fmt.Sprintf("create table inet %s { comment %q; }\n", network.Table, lease.Token) + policy
+	policy = fmt.Sprintf("create table inet %s { comment %q; }\n", m.tableName(), lease.Token) + policy
+	return m.install(ctx, lease, policy)
+}
+
+// AcquireBootstrap installs only the offline policy under a persisted intent.
+func (m *Manager) AcquireBootstrap(ctx context.Context, lease Lease) (Lease, error) {
+	if !m.bootstrap || lease.Handle != 0 || !tokenPattern.MatchString(lease.Token) {
+		return Lease{}, fmt.Errorf("bootstrap acquisition requires its own manager and reserved identity")
+	}
+	policy := fmt.Sprintf("create table inet %s { comment %q; }\n", m.tableName(), lease.Token) + network.BootFirewall()
 	return m.install(ctx, lease, policy)
 }
 

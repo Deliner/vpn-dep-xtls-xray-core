@@ -37,3 +37,13 @@ cronet-build target output:
 [group('runtime')]
 cronet-range-test candidate:
     @bash ops/quality/check.sh static-analysis bash ops/testing/cronet/range.sh "$1"
+
+# Reproduce TUIC's missing QUIC shutdown on the exact locked graph, then race-test the local patch.
+[group('runtime')]
+tuic-shutdown-test output:
+    @bash ops/quality/check.sh static-analysis bash ops/runtime/sing-box/tuic/regression.sh "$1"
+
+# Repeat the verified TUIC shutdown regression natively inside the owned Fleet Linux VM.
+[group('runtime')]
+tuic-shutdown-linux-test directory:
+    @bash ops/quality/check.sh static-analysis bash ops/runtime/sing-box/tuic/native.sh "$1"

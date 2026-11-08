@@ -1,0 +1,7 @@
+{{define "login"}}{{template "header" .}}
+<section class="login-card card"><span class="brand-mark large">N</span><p class="eyebrow">КОНТРОЛЛЕР VPN-НОД</p><h2>Ваш флот. Одна панель.</h2>
+<p>Войдите с файлом доступа администратора, созданным при инициализации этого контроллера.</p>
+<form method="post" action="/panel/login" enctype="multipart/form-data">{{template "csrf" .}}
+<label for="credential">Файл доступа</label><input id="credential" name="credential" type="file" accept=".json,application/json" required>
+<p class="hint">admin-credential.json · Сессия действует 30 минут.</p><button type="submit">Войти в панель →</button></form>
+<p class="login-note">HTTPS · Подписанные задания · Pull-обновления</p></section>{{template "footer" .}}{{end}}
