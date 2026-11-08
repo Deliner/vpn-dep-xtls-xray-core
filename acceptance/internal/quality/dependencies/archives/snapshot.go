@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
-	"vpn-script/internal/platform/safeio"
 	"vpn-script/internal/quality/dependencies/commands"
 )
 
@@ -23,22 +21,13 @@ func snapshot(ctx context.Context, run commands.Runner, root string) (map[string
 		if err != nil {
 			return nil, err
 		}
-		if mode == "160000" {
-			files[name] = fileIdentity{Gitlink: object}
-			continue
-		}
-		path := filepath.Join(root, name)
-		digest, err := safeio.FileHash(path)
+		identity, err := sourceIdentity(root, name, mode, object)
 		if err != nil {
 			return nil, err
 		}
-		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("source must be regular: %s: %v", name, err)
-		}
-		files[name] = fileIdentity{SHA256: digest, Executable: info.Mode()&0111 != 0}
+		files[name] = identity
 	}
-	return files, nil
+	return files, validateSourceLinks(files)
 }
 
 func sourceEntry(entry string) (string, string, string, error) {
@@ -47,8 +36,8 @@ func sourceEntry(entry string) (string, string, string, error) {
 	if !found || len(fields) != 3 || fields[2] != "0" || !filepath.IsLocal(name) || filepath.ToSlash(filepath.Clean(name)) != name {
 		return "", "", "", fmt.Errorf("unexpected tracked source entry %q", entry)
 	}
-	if fields[0] != "160000" && fields[0] != "100644" && fields[0] != "100755" {
-		return "", "", "", fmt.Errorf("source requires regular files or explicit Git links: %s", name)
+	if fields[0] != "160000" && fields[0] != "120000" && fields[0] != "100644" && fields[0] != "100755" {
+		return "", "", "", fmt.Errorf("source requires tracked regular files, symlinks or Git links: %s", name)
 	}
 	object, err := hex.DecodeString(fields[1])
 	if err != nil || len(object) != 20 {

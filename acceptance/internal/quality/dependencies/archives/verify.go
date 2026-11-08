@@ -12,6 +12,9 @@ import (
 )
 
 func verifyArchive(raw []byte, prefix string, expected map[string]fileIdentity) error {
+	if err := validateSourceLinks(expected); err != nil {
+		return err
+	}
 	compressed, err := gzip.NewReader(bytes.NewReader(raw))
 	if err != nil {
 		return err
@@ -68,8 +71,18 @@ func verifyMember(reader io.Reader, header *tar.Header, prefix string, expected 
 	}
 	name := strings.TrimPrefix(header.Name, prefix)
 	identity, found := expected[name]
-	if header.Typeflag != tar.TypeReg || !found || identity.Gitlink != "" || seen[name] || header.Size < 0 || header.Size > 150_000_000 {
+	if !found || identity.Gitlink != "" || seen[name] || header.Size < 0 || header.Size > 150_000_000 {
 		return fmt.Errorf("unexpected or duplicate source member %q", name)
+	}
+	if identity.Symlink != "" {
+		if err := verifySourceLink(header, identity); err != nil {
+			return err
+		}
+		seen[name] = true
+		return nil
+	}
+	if header.Typeflag != tar.TypeReg {
+		return fmt.Errorf("expected regular source member: %s", name)
 	}
 	hash := sha256.New()
 	if _, err := io.Copy(hash, reader); err != nil {

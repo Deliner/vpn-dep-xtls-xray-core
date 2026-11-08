@@ -40,7 +40,7 @@ func TestArchiveGlobalMetadataMustMatchTheSelectedCommit(t *testing.T) {
 	}
 }
 
-func TestSourceIndexRequiresTrackedRegularFilesOrExplicitGitlinks(t *testing.T) {
+func TestSourceIndexRequiresSupportedTypesAndCompleteGitObjectIDs(t *testing.T) {
 	for _, entry := range []string{"bad", "120000 abc 0\tsymlink", "100644 abc 1\tconflicted", "100644 abc 0\t../escape"} {
 		if _, _, _, err := sourceEntry(entry); err == nil {
 			t.Fatalf("accepted %q", entry)
@@ -50,5 +50,9 @@ func TestSourceIndexRequiresTrackedRegularFilesOrExplicitGitlinks(t *testing.T) 
 	name, mode, object, err := sourceEntry("160000 " + revision + " 0\tclients/android")
 	if err != nil || name != "clients/android" || mode != "160000" || object != revision {
 		t.Fatalf("lost explicit Git link: %s %s %s %v", name, mode, object, err)
+	}
+	name, mode, object, err = sourceEntry("120000 " + revision + " 0\tbin/tool")
+	if err != nil || name != "bin/tool" || mode != "120000" || object != revision {
+		t.Fatalf("lost tracked symlink: %s %s %s %v", name, mode, object, err)
 	}
 }

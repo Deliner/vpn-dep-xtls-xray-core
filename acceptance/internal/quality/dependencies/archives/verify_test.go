@@ -14,6 +14,7 @@ type member struct {
 	body     string
 	mode     int64
 	typeflag byte
+	linkname string
 }
 
 func sourceFixture(t *testing.T, members ...member) []byte {
@@ -22,7 +23,7 @@ func sourceFixture(t *testing.T, members ...member) []byte {
 	compressed := gzip.NewWriter(&raw)
 	writer := tar.NewWriter(compressed)
 	for _, m := range members {
-		if err := writer.WriteHeader(&tar.Header{Name: m.name, Size: int64(len(m.body)), Mode: m.mode, Typeflag: m.typeflag}); err != nil {
+		if err := writer.WriteHeader(&tar.Header{Name: m.name, Size: int64(len(m.body)), Mode: m.mode, Typeflag: m.typeflag, Linkname: m.linkname}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := writer.Write([]byte(m.body)); err != nil {

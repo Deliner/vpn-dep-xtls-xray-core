@@ -1,3 +1,3 @@
 # component	owned_url	commit	tree
-cronet-go	https://github.com/Deliner/vpn-dep-sagernet-cronet-go.git	fd7138208716392e0b53f6fa65e53fbf36c9d5ce	4202753fa1678ab68fab1abc92998ae2b6eee226
-naiveproxy	https://github.com/Deliner/vpn-dep-sagernet-naiveproxy.git	fcb09f1c450d33c03b59d78942614a70d9b6bf9a	b62bfc649efe2cfe9f5081a96c45c11ca09f58c1
+cronet-go	https://github.com/Deliner/vpn-dep-sagernet-cronet-go.git	1615f9a259134bb245b46eb182611e76d73ff061	f6ab28d56d5d123ed8063cc7fdd26ef5e05eb5e7
+naiveproxy	https://github.com/Deliner/vpn-dep-sagernet-naiveproxy.git	7480b18651fe22eaea65bf9d3c3f7f64639b5448	fafb2ba0727f6b2f8d0b083342d3d3cfe36f0b1f

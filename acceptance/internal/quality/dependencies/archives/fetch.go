@@ -28,6 +28,7 @@ func Fetch(ctx context.Context, run commands.Runner, root, revision string) (Pin
 	name := path.Base(repo) + "-" + revision
 	pin := Pin{Source: identity, URL: "https://codeload.github.com/" + repo + "/tar.gz/" + revision, Files: len(expected)}
 	pin.Submodules = submodules(expected)
+	pin.Symlinks = sourceLinks(expected)
 	pin.Files -= len(pin.Submodules)
 	directory, raw, err := download(ctx, run, name, pin.URL)
 	if err != nil {

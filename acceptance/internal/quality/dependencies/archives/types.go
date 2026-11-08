@@ -9,10 +9,12 @@ type Pin struct {
 	Size       int               `json:"size"`
 	Files      int               `json:"files"`
 	Submodules map[string]string `json:"submodules"`
+	Symlinks   map[string]string `json:"symlinks,omitempty"`
 }
 
 type fileIdentity struct {
 	SHA256     string
 	Executable bool
 	Gitlink    string
+	Symlink    string
 }

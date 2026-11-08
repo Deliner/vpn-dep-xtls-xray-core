@@ -38,7 +38,7 @@ if [[ "$suite" == cronet ]]; then
     fi
   done
   printf 'build-evidence-verified\n' > "$acceptance_output/status"
-  printf 'Native build evidence verified; ABI/payload/CVE acceptance remains open: %s\n' "$collection"
+  printf 'Native build and configured regression/payload evidence verified; C/C++ audit remains open: %s\n' "$collection"
   exit 0
 fi
 if [[ "$suite" == client ]]; then
