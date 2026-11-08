@@ -23,6 +23,18 @@ func protectedParents(path string, owner int) error {
 
 func protectedFile(path string, owner int) error { return protected(path, owner, false) }
 
+// PrivateInput prevents an unattended service from trusting writable parents or
+// non-private credentials. Existing permissions are inspected, never repaired.
+func PrivateInput(path string) error {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+		return fmt.Errorf("service input requires a clean absolute path")
+	}
+	if err := protectedParents(filepath.Dir(path), 0); err != nil {
+		return err
+	}
+	return safeio.CheckAccess(path, 0600, 0, 0)
+}
+
 func protected(path string, owner int, directory bool) error {
 	info, err := os.Lstat(path)
 	if err != nil {

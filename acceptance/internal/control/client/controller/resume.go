@@ -38,10 +38,10 @@ func Resume(ctx context.Context, output io.Writer) error {
 	if err := validateIdentity(ctx, value); err != nil {
 		return err
 	}
-	return resume(ctx, owner, value, status, output)
+	return resume(ctx, owner, value, status, output, false)
 }
 
-func resume(ctx context.Context, owner *host.Owner, value session.Request, status session.Status, output io.Writer) error {
+func resume(ctx context.Context, owner *host.Owner, value session.Request, status session.Status, output io.Writer, supervised bool) error {
 	control, err := listen(owner)
 	if err != nil {
 		return err
@@ -53,5 +53,5 @@ func resume(ctx context.Context, owner *host.Owner, value session.Request, statu
 	if active == nil {
 		return err
 	}
-	return supervise(ctx, control, active, value, output, err)
+	return supervise(ctx, control, active, value, output, err, supervised)
 }

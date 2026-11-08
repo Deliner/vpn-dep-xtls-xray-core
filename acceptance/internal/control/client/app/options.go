@@ -9,8 +9,8 @@ import (
 )
 
 type options struct {
-	bundle, route, profile, output, runtimes string
-	network                                  network.Options
+	bundle, route, profile, output, runtimes, binary string
+	network                                          network.Options
 }
 
 func parse(command string, args []string, output io.Writer) (options, error) {
@@ -35,7 +35,7 @@ func (value *options) flags(command string, flags *flag.FlagSet) error {
 		flags.StringVar(&value.bundle, "bundle", "", "trusted exported clients directory")
 		flags.StringVar(&value.route, "route", "main", "exported route name")
 		flags.StringVar(&value.output, "output", "", "new private profile file")
-	case "plan", "start":
+	case "plan", "start", "service-run", "service-plan":
 		flags.StringVar(&value.profile, "profile", "", "trusted imported profile file")
 		value.networkFlags(flags)
 		if command == "plan" {
@@ -44,7 +44,11 @@ func (value *options) flags(command string, flags *flag.FlagSet) error {
 		} else {
 			flags.StringVar(&value.runtimes, "runtimes", "", "trusted runtime paths and SHA-256 inventory")
 		}
-	case "diagnostics", "stop", "reconnect", "resume":
+		if command == "service-plan" {
+			flags.StringVar(&value.binary, "binary", "", "absolute installed Linux client executable path")
+			flags.StringVar(&value.output, "output", "", "new service unit file; does not install or activate")
+		}
+	case "diagnostics", "stop", "reconnect", "resume", "service-prepare":
 	default:
 		return fmt.Errorf("unknown client command")
 	}
@@ -65,8 +69,10 @@ func (value options) complete(command string) bool {
 		return value.bundle != "" && value.output != ""
 	case "plan":
 		return value.profile != "" && value.output != ""
-	case "start":
+	case "start", "service-run":
 		return value.profile != "" && value.runtimes != ""
+	case "service-plan":
+		return value.profile != "" && value.runtimes != "" && value.binary != "" && value.output != ""
 	default:
 		return true
 	}

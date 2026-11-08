@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y nftables iproute2 dbus systemd-resolved ca-certificates
-      - name: Execute the actual Linux client with race instrumentation
+      - name: Verify foreground and systemd client recovery with race instrumentation
         working-directory: acceptance
         run: build/tools/bin/just acceptance-client-run '${{ matrix.arch }}'
       - name: Retain client evidence even on failure

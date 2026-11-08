@@ -13,7 +13,7 @@ func TestActivationCommandsRefuseMacBeforeReadingInputs(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("macOS host safety contract")
 	}
-	for _, args := range [][]string{{"start", "--profile", "/does/not/exist", "--runtimes", "/does/not/exist"}, {"stop"}, {"diagnostics"}, {"reconnect"}, {"resume"}} {
+	for _, args := range [][]string{{"start", "--profile", "/does/not/exist", "--runtimes", "/does/not/exist"}, {"stop"}, {"diagnostics"}, {"reconnect"}, {"resume"}, {"service-prepare"}, {"service-run", "--profile", "missing", "--runtimes", "missing"}} {
 		var output bytes.Buffer
 		err := app.Run(args, &output)
 		if err == nil || !strings.Contains(err.Error(), "Linux root") || output.Len() != 0 {

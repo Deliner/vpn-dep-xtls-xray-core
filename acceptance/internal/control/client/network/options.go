@@ -33,8 +33,16 @@ func Validate(imported profile.Imported, options Options) error {
 	if err := profile.Validate(imported); err != nil {
 		return err
 	}
-	if !regexp.MustCompile(`^nhop[a-z0-9_-]{0,10}$`).MatchString(options.Interface) || options.EngineUID < 100 || int64(options.EngineUID) > 4294967294 {
-		return fmt.Errorf("invalid private TUN interface or service UID")
+	if options.EngineUID < 100 || int64(options.EngineUID) > 4294967294 {
+		return fmt.Errorf("invalid service UID")
+	}
+	return ValidateSettings(options)
+}
+
+// ValidateSettings checks user policy before a service account is resolved.
+func ValidateSettings(options Options) error {
+	if !regexp.MustCompile(`^nhop[a-z0-9_-]{0,10}$`).MatchString(options.Interface) {
+		return fmt.Errorf("invalid private TUN interface")
 	}
 	if options.IPv6 != "tunnel" && options.IPv6 != "block" || options.MTU < 1280 || options.MTU > 9000 {
 		return fmt.Errorf("expected IPv6 tunnel/block policy and MTU 1280..9000")

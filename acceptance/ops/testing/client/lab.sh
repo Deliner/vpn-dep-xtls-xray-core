@@ -24,9 +24,9 @@ client_lab_begin() {
 }
 
 client_lab_run() {
-  local mode="$1" ipv6="${2:-tunnel}" run_name digest result
-  (cd "$run"; shasum -a 256 network.test guest.sh resolved-guest.sh provenance.txt; for binary in bin/*; do [[ -f "$binary" ]] || continue; shasum -a 256 "$binary"; done) > "$run/SHA256SUMS"
-  COPYFILE_DISABLE=1 tar --no-xattrs -czf "$run/package.tar.gz" -C "$run" network.test guest.sh resolved-guest.sh provenance.txt SHA256SUMS bin
+  local mode="$1" ipv6="${2:-tunnel}" run_name digest result name
+  (cd "$run"; shasum -a 256 network.test guest.sh *-guest.sh provenance.txt; for binary in bin/*; do [[ -f "$binary" ]] || continue; shasum -a 256 "$binary"; done) > "$run/SHA256SUMS"
+  (cd "$run"; COPYFILE_DISABLE=1 tar --no-xattrs -czf package.tar.gz network.test guest.sh *-guest.sh provenance.txt SHA256SUMS bin)
   run_name="client-kernel-$(basename "$run")"
   lab_shell mkdir -p "runs/$run_name"
   "$lab_lima" copy "$run/package.tar.gz" "$lab_instance:/home/nhop/runs/$run_name/package.tar.gz"
@@ -38,11 +38,21 @@ printf '%s  package.tar.gz\n' "$2" | sha256sum --check
 tar -xzf package.tar.gz
 sha256sum --check SHA256SUMS
 before_host_files="$(sha256sum /etc/passwd /etc/group /etc/ssl/certs/ca-certificates.crt /etc/resolv.conf)"
+before_host_policy="$(ip -4 -j rule; ip -6 -j rule; findmnt -n -o OPTIONS --target /run)"
 if sudo -n unshare --mount --net bash guest.sh "$3" "$4"; then result=0; else result=$?; fi
 [[ "$(sha256sum /etc/passwd /etc/group /etc/ssl/certs/ca-certificates.crt /etc/resolv.conf)" == "$before_host_files" ]]
+[[ "$(ip -4 -j rule; ip -6 -j rule; findmnt -n -o OPTIONS --target /run)" == "$before_host_policy" ]]
+printf 'Verified unchanged guest root NSS/CA/DNS files, IPv4/IPv6 policy rules and /run mount options\n'
 exit "$result"
 GUEST
   then result=0; else result=$?; fi
+  if [[ "$mode" == systemd ]]; then
+    for name in systemd-unit.txt systemd-unit.sha256; do
+      if lab_shell sudo -n test -f "/home/nhop/runs/$run_name/$name"; then
+        lab_shell sudo -n cat "/home/nhop/runs/$run_name/$name" > "$run/$name"
+      fi
+    done
+  fi
   # Print only after the command's redirection has been unwound, never in EXIT.
   cat "$run/guest.log"
   if ((result != 0)); then return "$result"; fi

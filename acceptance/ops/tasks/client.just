@@ -8,10 +8,25 @@ client-import bundle route output:
 client-plan profile output engine_uid ipv6='tunnel':
     go run ./cmd/nhop-client plan --profile "$1" --output "$2" --engine-uid "$3" --ipv6 "$4"
 
+# Render a manual-start Linux systemd unit without installing it or changing host networking.
+[group('client')]
+client-service-plan binary profile runtimes output ipv6='tunnel':
+    go run ./cmd/nhop-client service-plan --binary "$1" --profile "$2" --runtimes "$3" --output "$4" --ipv6 "$5"
+
 # MUTATES LINUX CLIENT NETWORK: stay in foreground with root-only control and fail-closed cancellation.
 [group('client')]
 client-start profile runtimes ipv6='tunnel':
     ./build/bin/nhop-client start --profile "$1" --runtimes "$2" --ipv6 "$3"
+
+# MUTATES LINUX CLIENT NETWORK: start/resume protected intent and exit on failure for a service supervisor.
+[group('client')]
+client-service-run profile runtimes ipv6='tunnel':
+    ./build/bin/nhop-client service-run --profile "$1" --runtimes "$2" --ipv6 "$3"
+
+# Linux-root service preflight: verify/create private controller state without changing networking.
+[group('client')]
+client-service-prepare:
+    ./build/bin/nhop-client service-prepare
 
 # Show credential-free local session status; unavailable controllers are explicitly labelled.
 [group('client')]
@@ -57,3 +72,8 @@ client-session-test xray singbox:
 [group('client')]
 client-public-test xray singbox ipv6='tunnel':
     @bash ops/quality/check.sh static-analysis bash ops/testing/client/public.sh "$1" "$2" "$3"
+
+# Verify real systemd restart, protected intent and continuous leak denial only in the owned Linux VM.
+[group('client')]
+client-service-test xray singbox ipv6='tunnel':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/systemd.sh "$1" "$2" "$3"

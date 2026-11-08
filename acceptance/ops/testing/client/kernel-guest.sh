@@ -13,6 +13,7 @@ case "${1:-policy}" in
   resolver) pattern='^TestKernelResolvedPrivateLinkLifecycle$' ;;
   session) pattern='^TestKernelSessionStartStopAndFailures$' ;;
   public) pattern='^TestKernelPublicClientAndControllerRecovery$' ;;
+  systemd) pattern='^TestKernelSystemdManagedRecovery$' ;;
   *) exit 2 ;;
 esac
 case "${2:-tunnel}" in tunnel|block) export NHOP_CLIENT_IPV6="${2:-tunnel}" ;; *) exit 2 ;; esac
@@ -25,10 +26,16 @@ client_daemons=()
 client_guest_cleanup() {
   local result=$? pid
   trap - EXIT
+  if [[ -n "${NHOP_CLIENT_SYSTEMD_UNIT:-}" ]]; then
+    if ! client_systemd_cleanup; then result=1; fi
+  fi
   ip netns pids nhop-client-inner | xargs -r kill || true
   # Reap the actual children before logs are hashed by the caller.
   for pid in "${client_daemons[@]}"; do wait "$pid" || true; done
   ip netns delete nhop-client-inner || true
+  if [[ -n "${NHOP_CLIENT_SYSTEMD_ROOT:-}" ]]; then
+    if ! client_systemd_remove_fixture; then result=1; fi
+  fi
   exit "$result"
 }
 trap client_guest_cleanup EXIT
@@ -55,21 +62,29 @@ if [[ "${1:-}" == resolver ]]; then
   ip link set nhopdns up
   export NHOP_CLIENT_RESOLVED_TEST=private-netns
 fi
-if [[ "${1:-}" == session || "${1:-}" == public ]]; then
+if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == systemd ]]; then
+  if [[ "${1:-}" == systemd ]]; then source ./systemd-guest.sh; fi
   source ./resolved-guest.sh
   client_private_resolved "$1"
 fi
-if [[ "${1:-}" == public ]]; then
+if [[ "${1:-}" == public || "${1:-}" == systemd ]]; then
   ip netns exec nhop-client-inner resolvectl dns client 198.51.100.7
   ip netns exec nhop-client-inner resolvectl default-route client yes
   ip netns exec nhop-client-inner resolvectl dnsovertls client no
   ip netns exec nhop-client-inner resolvectl llmnr client no
   ip netns exec nhop-client-inner resolvectl mdns client no
   mkdir -p /run/nhop-client
-  mount -t tmpfs -o mode=0711 nhop-client-control-test /run/nhop-client
+  if [[ "${1:-}" == systemd ]]; then
+    mount --bind "$NHOP_CLIENT_SYSTEMD_ROOT/control" /run/nhop-client
+  else
+    mount -t tmpfs -o mode=0711 nhop-client-control-test /run/nhop-client
+  fi
   export NHOP_CLIENT_PUBLIC_TEST=private-netns
+fi
+if [[ "${1:-}" == systemd ]]; then
+  client_systemd_prepare
 fi
 NHOP_CLIENT_KERNEL_TEST=private-netns NHOP_CLIENT_RUNTIME="$PWD/bin" ./network.test \
   -test.run "$pattern" -test.v -test.timeout=2m
-case "${1:-}" in resolver|session|public) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
-if [[ "${1:-}" == session || "${1:-}" == public ]]; then cat bus.log resolved.log; fi
+case "${1:-}" in resolver|session|public|systemd) ;; *) ip netns exec nhop-client-inner nft -j list table inet nhop_client ;; esac
+if [[ "${1:-}" == session || "${1:-}" == public || "${1:-}" == systemd ]]; then cat bus.log resolved.log; fi
