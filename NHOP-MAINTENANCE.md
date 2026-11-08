@@ -43,3 +43,20 @@ The test measures actual within-flow reorder events and requires observations
 in every jitter batch. All 48 exchanges completed within their original two-second
 budgets with the race detector on Darwin ARM64. This passing isolation control
 does not reproduce or fix the separate Linux MASQUE delay failure.
+
+The netTun egress device now rotates active packet flows within the existing
+1024-packet global budget. Base-header TCP/UDP uses directional five-tuples;
+fragments and IPv6 extensions use address/protocol buckets. Bytes are unchanged,
+packets are not discarded to improve latency, and order within each recognized
+flow is retained. Queue metadata is proportional to retained packets. A full
+queue still applies backpressure; closing wakes both directions and releases only
+queued ownership, leaving failed pushes and successful pops with their callers.
+
+The mixed-flow regression queues eight 32-packet UDP flows and one TCP control
+packet. Before this change the TCP packet was 257th; after it is ninth, with all
+256 UDP packets retained in per-flow order. WireGuard/netTun and queue ownership,
+backpressure, close, IPv4/IPv6 and truncated-header controls pass with the race
+detector on Darwin ARM64. Isolated Linux observations of the previous FIFO placed
+initial TCP ACKs in the device queue for 291–926 ms under the existing MASQUE
+delay test. Real QUIC/netem acceptance of this scheduling change remains separate;
+this regression does not establish a complete MASQUE fix or an MTU correction.

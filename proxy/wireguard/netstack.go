@@ -23,6 +23,7 @@ import (
 	"github.com/xtls/xray-core/common/buf"
 	xnet "github.com/xtls/xray-core/common/net"
 	xtun "github.com/xtls/xray-core/proxy/tun"
+	"github.com/xtls/xray-core/proxy/wireguard/packetqueue"
 	"golang.zx2c4.com/wireguard/tun"
 
 	"golang.org/x/net/dns/dnsmessage"
@@ -37,7 +38,7 @@ type netTun struct {
 	stack  xtun.Stack
 	events chan tun.Event
 	// packets are what the stack has sent and Read has not taken yet
-	packets   chan *buf.Buffer
+	packets   *packetqueue.Queue
 	closed    chan struct{}
 	closeOnce sync.Once
 	mtu       int
@@ -49,7 +50,7 @@ type netTun struct {
 func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int, handler xtun.ConnectionHandler) (tun.Device, *Net, error) {
 	dev := &netTun{
 		events:  make(chan tun.Event, 10),
-		packets: make(chan *buf.Buffer, netTunQueue),
+		packets: packetqueue.New(netTunQueue),
 		closed:  make(chan struct{}),
 		mtu:     mtu,
 	}
@@ -89,14 +90,13 @@ func (tun *netTun) Events() <-chan tun.Event {
 }
 
 func (tun *netTun) Read(buf [][]byte, sizes []int, offset int) (int, error) {
-	select {
-	case packet := <-tun.packets:
-		sizes[0] = copy(buf[0][offset:], packet.Bytes())
-		packet.Release()
-		return 1, nil
-	case <-tun.closed:
-		return 0, os.ErrClosed
+	packet, err := tun.packets.Pop()
+	if err != nil {
+		return 0, err
 	}
+	sizes[0] = copy(buf[0][offset:], packet.Bytes())
+	packet.Release()
+	return 1, nil
 }
 
 func (tun *netTun) Write(buf [][]byte, offset int) (int, error) {
@@ -113,13 +113,11 @@ func (tun *netTun) WritePacket(header, payload []byte) error {
 	packet := buf.NewWithSize(int32(len(header) + len(payload)))
 	packet.Write(header)
 	packet.Write(payload)
-	select {
-	case tun.packets <- packet:
-		return nil
-	case <-tun.closed:
+	if err := tun.packets.Push(packet); err != nil {
 		packet.Release()
-		return os.ErrClosed
+		return err
 	}
+	return nil
 }
 
 // ReadPacket implements xtun.Tun. It is not called: the packets are handed to the stack by Write
@@ -142,6 +140,7 @@ func (tun *netTun) Close() error {
 	tun.closeOnce.Do(func() {
 		// before the stack ends its connections: nobody may be reading anymore what it writes for that
 		close(tun.closed)
+		tun.packets.Close()
 		tun.stack.Close()
 		close(tun.events)
 	})
