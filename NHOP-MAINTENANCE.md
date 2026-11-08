@@ -14,5 +14,23 @@ official release: Brotli, klauspost/compress, x/net HTML and x/crypto OpenPGP.
 These locks match the existing tested N-hop candidate inputs; this is not an
 upstream release or a claim that every dependency is already sourced from our forks.
 
-MASQUE H3 intermittent UDP loss is still under investigation. The UDP port fix
-does not establish a cause or fix for that separate observation.
+CONNECT-IP opts into a per-stream HTTP/3 receive budget of 1024 packets and
+1 MiB of payload using the exact owned quic-go commit
+`037c5a9142ac658960f28313d54c8607c030a1e1`. The client sets it before request headers;
+the proxy sets it before address assignment. Setup failure cancels both directions.
+The lazy ring has independent packet and byte bounds; other HTTP/3 streams keep
+the upstream 32-packet default. HTTP/2 capsule queues and legacy WARP draft
+connection-level datagrams are not enlarged. No packet logging is shipped.
+
+The previous 32-packet stream queue drops the 33rd item in a deterministic
+256-packet delayed-consumer regression; the bounded queue accepts that burst.
+Both real CONNECT-IP directions also retain 256 distinct 900-byte datagrams while
+the application reader is delayed. The full `transport/internet/masque/...` and
+`proxy/masque` suites pass with the race detector on Darwin ARM64. This validates
+the opt-in API wiring and preserves the HTTP/2, WARP and stream lifecycle tests.
+
+Controlled Linux fault acceptance remains separate. Underlying QUIC, kernel and
+proxy queues remain finite, and DATAGRAM transport is unreliable. This patch does
+not claim to fix MTU reductions, all loss under latency/load, or the original rare
+all-protocol MASQUE failure. The profile remains experimental until those open
+observations have their own reproducible regression and verified correction.

@@ -78,6 +78,9 @@ func (c *ClientConn) Dial(req *Request) (*Conn, *http.Response, error) {
 			rstr.CancelWrite(quic.StreamErrorCode(http3.ErrCodeNoError))
 		}
 	}()
+	if err := prepareDatagramReceive(rstr); err != nil {
+		return nil, nil, err
+	}
 	if err := rstr.SendRequestHeader(httpReq); err != nil {
 		return nil, nil, fmt.Errorf("connect-ip: failed to send request: %w", err)
 	}
