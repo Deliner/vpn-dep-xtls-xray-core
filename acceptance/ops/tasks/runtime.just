@@ -52,3 +52,8 @@ tuic-shutdown-test output:
 [group('runtime')]
 tuic-shutdown-linux-test directory:
     @bash ops/quality/check.sh static-analysis bash ops/runtime/sing-box/tuic/native.sh "$1"
+
+# Race-test the exact patched TUIC sources embedded in a verified candidate on the current native host.
+[group('runtime')]
+tuic-candidate-test candidate output:
+    @bash ops/quality/check.sh static-analysis bash ops/runtime/sing-box/tuic/candidate.sh "$1" "$2"

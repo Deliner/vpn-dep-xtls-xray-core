@@ -79,6 +79,10 @@ for arch in amd64 arm64; do
     done
   fi
   (cd "$report"; shasum -a 256 --check evidence.sha256) > "$report/integrity-verification.log"
+  if grep -Fq 'tuic-candidate-test' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
+    source "$acceptance_root/ops/runtime/sing-box/tuic/verify.sh"
+    tuic_verify_candidate "$report/tuic" "$report/sing-box-SHA256SUMS" "$arch" >> "$report/integrity-verification.log"
+  fi
   if grep -Fq 'xray-congestion-regressions.log' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
     grep -Fq -- '--- PASS: TestNHOPBBRPathMTUDecrease (' "$report/xray-congestion-regressions.log" || exit 1
     grep -Fq -- '--- PASS: TestNHOPBBRRejectsNonpositiveDatagramSize (' "$report/xray-congestion-regressions.log" || exit 1

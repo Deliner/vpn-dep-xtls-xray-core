@@ -20,21 +20,31 @@ tags="$(sed -n 's/^build_tags=//p' "$candidate/provenance.txt")"
 cgo="$(sed -n 's/^build_cgo=//p' "$candidate/provenance.txt")"
 cgo="${cgo:-0}"
 scanner="$root/build/tools/bin/govulncheck"
+source "$root/ops/runtime/sing-box/tuic/audit.sh"
 candidate_inventory "$candidate" > "$reports/actual.sha256"
 cmp "$candidate/SHA256SUMS" "$reports/actual.sha256" || { printf 'Candidate changed after build\n' >&2; exit 1; }
 date -u '+started_at=%Y-%m-%dT%H:%M:%SZ' > "$reports/scanner.txt"
 "$scanner" -version >> "$reports/scanner.txt" 2>&1
 cp "$candidate/provenance.txt" "$reports/provenance.txt"
 
+candidate_scan_source() {
+  local result=0
+  "$scanner" -C "$candidate/source" -tags "$tags" -show traces,verbose "$package" || result=$?
+  if [[ "$engine" == sing-box ]] && grep -Fxq 'tuic_patch_state=applied' "$candidate/provenance.txt"; then
+    candidate_tuic_audit_upstream || { local upstream_result=$?; if ((result == 0)); then result="$upstream_result"; fi; }
+  fi
+  return "$result"
+}
+
 status=0
 for scan in source binary; do
   if [[ "$scan" == source ]]; then
-    arguments=(-C "$candidate/source" -tags "$tags" -show traces,verbose "$package")
+    arguments=(candidate_scan_source)
   else
-    arguments=(-mode binary "$candidate/bin/$engine")
+    arguments=("$scanner" -mode binary "$candidate/bin/$engine")
   fi
   if GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED="$cgo" GOWORK=off \
-    "$scanner" "${arguments[@]}" > "$reports/$scan.txt" 2>&1; then
+    "${arguments[@]}" > "$reports/$scan.txt" 2>&1; then
     result=0
   else
     result=$?

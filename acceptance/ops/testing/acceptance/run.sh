@@ -28,6 +28,9 @@ for engine in xray sing-box; do
   cp "$output/provenance.txt" "$report/$engine-provenance.txt"
   cp "$output/SHA256SUMS" "$report/$engine-SHA256SUMS"
 done
+tuic_output="build/tuic-regression/candidate-linux-$arch"
+just tuic-candidate-test "build/runtime-candidates/sing-box-linux-$arch" "$tuic_output" > "$report/tuic-candidate.log" 2>&1
+cp -R "$tuic_output" "$report/tuic"
 xray_source="$root/build/runtime-candidates/xray-linux-$arch/source"
 just dependency-test "$xray_source" ./transport/internet/masque/... > "$report/xray-masque-regressions.log" 2>&1
 just dependency-test "$xray_source" ./transport/internet/hysteria/congestion/... > "$report/xray-congestion-regressions.log" 2>&1

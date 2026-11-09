@@ -25,7 +25,7 @@ func newFixture(t *testing.T) fixture {
 	}
 	f := fixture{root: root}
 	f.archive, f.trace = filepath.Join(f.root, "fixture.tar.gz"), filepath.Join(f.root, "trace")
-	for _, script := range []string{"candidate.sh", "audit-candidate.sh", "integrity.sh", "compare.sh", "xray/build.sh", "xray/ephemeral-ports.patch", "sing-box/build.sh", "sing-box/cronet.sh", "sing-box/native.sh"} {
+	for _, script := range []string{"candidate.sh", "audit-candidate.sh", "integrity.sh", "compare.sh", "xray/build.sh", "xray/ephemeral-ports.patch", "sing-box/build.sh", "sing-box/cronet.sh", "sing-box/native.sh", "sing-box/tuic/prepare.sh", "sing-box/tuic/audit.sh"} {
 		data, err := os.ReadFile("../../../ops/runtime/" + script)
 		if err != nil {
 			t.Fatal(err)

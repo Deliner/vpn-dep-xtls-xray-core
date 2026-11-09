@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 source "$recipe/cronet.sh"
 source "$recipe/native.sh"
+source "$recipe/tuic/prepare.sh"
 
 candidate_configure() {
+  candidate_tuic_prepare
   candidate_cronet_prepare
-  build_label=nhop-fork-cronet154-1
+  build_label=nhop-fork-cronet154-tuic-1
   build_package=./cmd/sing-box
   build_tags="$(cat "$work/source/release/DEFAULT_BUILD_TAGS"),nhop_fork_cronet154_1"
   build_flags="-X github.com/sagernet/sing-box/constant.Version=$version $(cat "$work/source/release/LDFLAGS") -s -w -buildid="
   build_cgo=1
   if [[ "$target_os" == linux ]]; then
     candidate_cronet_release
-    build_label=nhop-fork-cronet154-zlib-1
+    build_label=nhop-fork-cronet154-zlib-tuic-1
     build_tags+=,with_purego
     build_cgo=0
   elif [[ "$(go env GOHOSTOS)" != darwin ]]; then
