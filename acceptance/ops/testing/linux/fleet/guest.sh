@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-[[ "$(uname -s)" == Linux && "$(hostname)" == lima-payload && -d /run/systemd/system ]] || exit 2
 bundle="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$bundle"
+mode="${NHOP_FLEET_ACCEPTANCE:-private-lima}"
+source "$bundle/context.sh"
+fleet_execution_context
 sha256sum --check SHA256SUMS
 mkdir reports
 printf 'running\n' > reports/status
@@ -23,7 +25,12 @@ sudo -n mkdir -m 0700 "$stage/reports"
 started="$(date +%s)"
 { uname -a; cat /etc/os-release; systemctl --version; } > reports/guest.txt
 status=0
-if sudo -n env NHOP_FLEET_ACCEPTANCE=private-lima NHOP_FLEET_BINARY="$stage/nhop-fleet" \
+if sudo -n env NHOP_FLEET_ACCEPTANCE="$mode" NHOP_SYSTEMD_ACCEPTANCE="$mode" NHOP_FLEET_BINARY="$stage/nhop-fleet" \
+  GITHUB_ACTIONS="${GITHUB_ACTIONS:-}" GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}" \
+  GITHUB_REPOSITORY_ID="${GITHUB_REPOSITORY_ID:-}" GITHUB_REPOSITORY_OWNER_ID="${GITHUB_REPOSITORY_OWNER_ID:-}" \
+  RUNNER_ENVIRONMENT="${RUNNER_ENVIRONMENT:-}" GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME:-}" GITHUB_REF="${GITHUB_REF:-}" \
+  GITHUB_SHA="${GITHUB_SHA:-}" GITHUB_RUN_ID="${GITHUB_RUN_ID:-}" NHOP_NODE_CI="${NHOP_NODE_CI:-}" \
+  GORACE=atexit_sleep_ms=0 \
   NHOP_FLEET_TEST_ROOT="$stage" NHOP_FLEET_REPORT="$stage/reports/fleet.json" \
   "$stage/fleet.test" -test.run '^TestNativeFleetLifecycle$' -test.v -test.timeout=20m > reports/fleet.log 2>&1; then
   printf 'passed\n' > reports/status

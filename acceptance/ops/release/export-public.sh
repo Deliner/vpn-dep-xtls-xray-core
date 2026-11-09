@@ -25,7 +25,7 @@ while IFS= read -r -d '' source; do
 done < <(find "$repo_root/docs" -type f -name '*.md' ! -name '*.local.md' -print0)
 while IFS= read -r -d '' source; do
   files+=("${source#"$repo_root/"}")
-done < <(find "$repo_root/ops" -type f \( -name '*.sh' -o -name '*.c' -o -name '*.md' -o -name '*.just' -o -name '*.tsv' -o -name '*.patch' \) ! -name '*.local.md' -print0)
+done < <(find "$repo_root/ops" -type f \( -name '*.sh' -o -name '*.c' -o -name '*.cc' -o -name '*.md' -o -name '*.just' -o -name '*.tsv' -o -name '*.patch' \) ! -name '*.local.md' -print0)
 while IFS= read -r -d '' source; do
   files+=("${source#"$repo_root/"}")
 done < <(find "$repo_root/ops/testing/acceptance" -type f -name '*.yml' -print0)

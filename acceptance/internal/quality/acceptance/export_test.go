@@ -23,7 +23,8 @@ func TestSourceExportBuildsEmbeddedViewsAndExcludesPrivateInputs(t *testing.T) {
 	files := exportedFiles(t, archive)
 	for _, name := range []string{"internal/ui/views/page.html", "internal/ui/views/style.css", "ops/release/runtime/xray.json",
 		"ops/release/runtime/cronet.json", "ops/release/runtime/sing-box.json",
-		"ops/testing/acceptance/installer/workflow.yml", "ops/testing/cronet/zlib/window.c", "ops/testing/cronet/zlib/window.patch"} {
+		"ops/testing/acceptance/installer/workflow.yml", "ops/testing/cronet/zlib/window.c", "ops/testing/cronet/zlib/window.patch",
+		"ops/testing/cronet/components/utf.cc"} {
 		raw, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil || files[name] != string(raw) || !strings.Contains(files["ops/release/SHA256SUMS"], safeio.Hash(raw)+"  vpn-script/"+name+"\n") {
 			t.Fatalf("maintained build input missing or changed: %s", name)
@@ -52,6 +53,7 @@ func exportFixture(t *testing.T) string {
 		"ops/release/runtime/xray.json", "ops/release/runtime/cronet.json", "ops/release/runtime/sing-box.json", "ops/release/runtime/private.json",
 		"ops/testing/acceptance/installer/workflow.yml",
 		"ops/testing/cronet/zlib/window.c", "ops/testing/cronet/zlib/window.patch",
+		"ops/testing/cronet/components/utf.cc",
 		"ops/runtime/inputs.tsv", "docs/public.md", "examples/example.yaml", "config.env", "build/private.html", ".ssh-custom/key.go", "docs/private.local.md"} {
 		write(t, filepath.Join(root, name), "fixture "+name+"\n", 0600)
 	}

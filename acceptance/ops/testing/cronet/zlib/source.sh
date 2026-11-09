@@ -1,23 +1,12 @@
 #!/usr/bin/env bash
 # Immutable source selection; never patch the maintained dependency checkout.
-window_verify_checkout() {
-  local row label
-  row="$(awk -F '\t' '$1 == "naiveproxy" {print}' "$root/ops/runtime/cronet/source.tsv")"
-  [[ -n "$row" && "$row" != *$'\n'* ]] || return 2
-  IFS=$'\t' read -r label url revision tree <<< "$row"
-  [[ "$url" == https://github.com/Deliner/vpn-dep-sagernet-naiveproxy.git ]] || return 2
-  [[ "$revision" =~ ^[0-9a-f]{40}$ && "$tree" =~ ^[0-9a-f]{40}$ ]] || return 2
-  checkout="$root/build/dependencies/checkouts/vpn-dep-sagernet-naiveproxy"
-  [[ "$(git -C "$checkout" remote get-url origin)" == "$url" ]] || return 2
-  [[ "$(git -C "$checkout" rev-parse HEAD)" == "$revision" ]] || return 2
-  [[ "$(git -C "$checkout" rev-parse HEAD^{tree})" == "$tree" ]] || return 2
-  [[ -z "$(git -C "$checkout" status --porcelain --untracked-files=all)" ]] || return 2
-}
+source "$root/ops/testing/cronet/source.sh"
 
 window_prepare_source() {
-  window_verify_checkout
+  cronet_verify_source
   cp "$root/ops/runtime/cronet/source.tsv" "$work/source.tsv"
   cp "$recipe/"* "$work/inputs/"
+  cp "$root/ops/testing/cronet/source.sh" "$work/inputs/checkout-source.sh"
   git -C "$checkout" archive "$revision" src/third_party/zlib > "$work/inputs/zlib-source.tar"
   tar -xf "$work/inputs/zlib-source.tar" --strip-components=3 -C "$work/baseline"
   [[ -z "$(find "$work/baseline" -type l -print)" ]] || return 2

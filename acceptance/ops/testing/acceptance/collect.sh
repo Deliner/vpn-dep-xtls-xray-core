@@ -47,6 +47,12 @@ if [[ "$suite" == cronet ]]; then
   printf 'Native build and configured regression/payload evidence verified; C/C++ audit remains open: %s\n' "$collection"
   exit 0
 fi
+if [[ "$suite" == fleet ]]; then
+  bash "$acceptance_root/ops/testing/acceptance/fleet/collect.sh" "$collection" "$acceptance_commit" "$acceptance_checkout/acceptance"
+  printf 'verified\n' > "$acceptance_output/status"
+  printf 'Native Linux Fleet acceptance verified: %s\n' "$collection"
+  exit 0
+fi
 if [[ "$suite" == client ]]; then
   bash "$acceptance_root/ops/testing/acceptance/client/collect.sh" "$collection" "$acceptance_commit" "$acceptance_checkout/acceptance"
   printf 'verified\n' > "$acceptance_output/status"

@@ -1,4 +1,4 @@
-name: N-hop Linux client acceptance
+name: N-hop native Fleet acceptance
 
 on:
   push:
@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  client:
-    name: Linux client ${{ matrix.arch }}
+  fleet:
+    name: Fleet lifecycle ${{ matrix.arch }}
     strategy:
       fail-fast: false
       matrix:
@@ -19,7 +19,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,18 +27,18 @@ jobs:
       - name: Bootstrap pinned tools
         working-directory: acceptance
         run: bash ops/environment/bootstrap.sh
-      - name: Install Linux namespace and DNS test prerequisites
+      - name: Install native Fleet prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y nftables iproute2 dbus systemd-resolved ca-certificates jq
-      - name: Verify boot registration, all-protocol TUN and client recovery with race instrumentation
+          sudo apt-get install -y iproute2 curl ca-certificates jq
+      - name: Verify real Fleet lifecycle and controller capacity
         working-directory: acceptance
-        run: build/tools/bin/just acceptance-client-run '${{ matrix.arch }}'
-      - name: Retain client evidence even on failure
+        run: build/tools/bin/just acceptance-fleet-run '${{ matrix.arch }}'
+      - name: Retain Fleet evidence even on failure
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: client-linux-${{ matrix.arch }}
-          path: acceptance/build/client-acceptance
+          name: fleet-linux-${{ matrix.arch }}
+          path: acceptance/build/fleet-acceptance
           if-no-files-found: error
           retention-days: 30

@@ -45,6 +45,11 @@ acceptance-cronet-payload arch candidate output:
 acceptance-client-run arch:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/client/run.sh "$1"
 
+# Run the real Fleet/systemd lifecycle with race instrumentation and 1000-node HTTPS capacity on owned native Linux CI.
+[group('acceptance')]
+acceptance-fleet-run arch:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/fleet/run.sh "$1"
+
 # Independently bind installed service evidence to its tested bytes, private context and recovery observations.
 [group('acceptance')]
 acceptance-client-installed-verify directory policy:

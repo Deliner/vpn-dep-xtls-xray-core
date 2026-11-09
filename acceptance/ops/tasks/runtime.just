@@ -58,6 +58,11 @@ cronet-range-test candidate:
 cronet-zlib-window-test output:
     @bash ops/quality/check.sh static-analysis bash ops/testing/cronet/zlib/run.sh "$1"
 
+# Check the exact vendored ICU UTF subset and SuperFastHash with bounded inputs and ASan/UBSan; no network changes.
+[group('runtime')]
+cronet-component-bounds-test output:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/cronet/components/run.sh "$1"
+
 # Reproduce TUIC's missing QUIC shutdown on the exact locked graph, then race-test the local patch.
 [group('runtime')]
 tuic-shutdown-test output:

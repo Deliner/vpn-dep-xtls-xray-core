@@ -10,4 +10,5 @@ GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOWORK=off go build -trimpath -buildvcs=
 GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOWORK=off go test -c -trimpath -buildvcs=false \
   -ldflags=-buildid= -o "$bundle/fleet.test" "$root/internal/control/fleet/acceptance"
 cp "$root/ops/testing/linux/fleet/guest.sh" "$bundle/guest.sh"
+cp "$root/ops/testing/linux/fleet/context.sh" "$bundle/context.sh"
 package_seal fleet

@@ -58,7 +58,7 @@ for implementation in generic optimized; do
   window_case "patched-$implementation" 0 0 0 32768
   window_case "patched-$implementation" 15 0 15 32768
 done
-window_verify_checkout
+cronet_verify_source
 printf 'passed\n' > "$work/status"
 (cd "$work"; find . -type f ! -name evidence.sha256 -exec shasum -a 256 '{}' \; | LC_ALL=C sort) > "$work/evidence.sha256"
 cat "$work/results.tsv"

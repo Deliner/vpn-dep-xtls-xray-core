@@ -4,11 +4,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"vpn-script/internal/control/integration/evidence/installation"
 	"vpn-script/internal/node/fleet/service"
 	"vpn-script/internal/platform/process"
 	"vpn-script/internal/platform/safeio"
@@ -23,13 +23,13 @@ func require(t *testing.T, err error) {
 
 func guard(t *testing.T) (string, string) {
 	t.Helper()
-	if os.Getenv("NHOP_FLEET_ACCEPTANCE") != "private-lima" {
-		t.Skip("real Fleet installation is restricted to just fleet-agent-test in the owned Linux VM")
+	if os.Getenv("NHOP_FLEET_ACCEPTANCE") == "" {
+		t.Skip("explicit Fleet acceptance requires an owned Linux VM or native CI")
 	}
-	host, err := os.Hostname()
-	require(t, err)
-	if runtime.GOOS != "linux" || os.Geteuid() != 0 || os.Getegid() != 0 || host != "lima-payload" {
-		t.Fatal("Fleet acceptance requires root in the owned Linux VM")
+	require(t, fleetMode(os.Getenv("NHOP_FLEET_ACCEPTANCE"), os.Getenv("NHOP_SYSTEMD_ACCEPTANCE")))
+	require(t, installation.OwnedHost())
+	if os.Getegid() != 0 {
+		t.Fatal("Fleet acceptance requires the root primary group")
 	}
 	root, binary := os.Getenv("NHOP_FLEET_TEST_ROOT"), os.Getenv("NHOP_FLEET_BINARY")
 	if !strings.HasPrefix(root, "/var/lib/nhop-fleet-acceptance-") || filepath.Clean(root) != root || binary != filepath.Join(root, "nhop-fleet") || os.Getenv("NHOP_FLEET_REPORT") != filepath.Join(root, "reports/fleet.json") {
