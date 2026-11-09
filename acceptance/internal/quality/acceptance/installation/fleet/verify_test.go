@@ -10,7 +10,7 @@ import (
 )
 
 func TestFleetCollectorRequiresRecoveryAndCompleteConcurrentTraffic(t *testing.T) {
-	for _, damage := range []string{"", "recovery", "interruption", "phase", "streams", "tcp", "udp", "error", "generation", "platform"} {
+	for _, damage := range []string{"", "recovery", "interruption", "controller", "phase", "streams", "tcp", "udp", "error", "generation", "platform"} {
 		t.Run(damage, func(t *testing.T) {
 			data := reportFixture()
 			damageReport(data, damage)
@@ -34,13 +34,13 @@ func TestFleetCollectorRequiresRecoveryAndCompleteConcurrentTraffic(t *testing.T
 func reportFixture() map[string]any {
 	data := map[string]any{"version": 1, "status": "passed", "platform": "linux/amd64", "revoke_exit_status": "78",
 		"generations":            []string{strings.Repeat("a", 64), strings.Repeat("b", 64), strings.Repeat("c", 64)},
-		"installer_interruption": map[string]any{"recovered": true}}
+		"installer_interruption": map[string]any{"recovered": true}, "controller_crash": map[string]any{"recovered": true}}
 	for _, flag := range []string{"rollback", "agent_stop_retains_vpn", "controller_recovery", "agent_crash_recovery",
 		"credentials_unchanged", "revoke_no_restart", "removed_state_retained"} {
 		data[flag] = true
 	}
 	phases := map[string]any{}
-	for _, name := range []string{"initial", "updated", "rolled-back-agent-stopped", "interrupted-install-recovered", "controller-offline", "agent-restarted", "revoked-agent-vpn-retained"} {
+	for _, name := range []string{"initial", "updated", "rolled-back-agent-stopped", "interrupted-install-recovered", "controller-offline", "agent-restarted", "controller-crashed", "controller-restarted", "revoked-agent-vpn-retained"} {
 		phases[name] = map[string]any{"phase": name, "profiles": 2, "required_rounds": 3, "barrier_rounds": 3,
 			"concurrent_tcp_udp_streams": 4, "routes": map[string]any{
 				"shadowsocks": map[string]any{"tcp_rounds": 3, "udp_rounds": 3},
@@ -59,6 +59,8 @@ func damageReport(data map[string]any, damage string) {
 		data["credentials_unchanged"] = false
 	case "interruption":
 		data["installer_interruption"].(map[string]any)["recovered"] = false
+	case "controller":
+		data["controller_crash"].(map[string]any)["recovered"] = false
 	case "phase":
 		delete(phases, "controller-offline")
 	case "streams":

@@ -9,7 +9,8 @@ fleet_verify_report() {
     .revoke_no_restart == true and .removed_state_retained == true and
     (.generations | length == 3 and (unique | length) == 3 and all(.[]; type == "string" and test("^[0-9a-f]{64}$"))) and
     .installer_interruption.recovered == true and
-    (.traffic | keys == ["agent-restarted","controller-offline","initial","interrupted-install-recovered","revoked-agent-vpn-retained","rolled-back-agent-stopped","updated"]) and
+    .controller_crash.recovered == true and
+    (.traffic | keys == ["agent-restarted","controller-crashed","controller-offline","controller-restarted","initial","interrupted-install-recovered","revoked-agent-vpn-retained","rolled-back-agent-stopped","updated"]) and
     all(.traffic | to_entries[]; .key == .value.phase and
       .value.profiles == 2 and .value.required_rounds == 3 and .value.barrier_rounds == 3 and
       .value.concurrent_tcp_udp_streams == 4 and

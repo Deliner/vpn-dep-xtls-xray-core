@@ -14,7 +14,7 @@ func TestNativeFleetLifecycle(t *testing.T) {
 	root, binary := guard(t)
 	f := &fixture{root: root, binary: binary, report: report{Version: 1, Platform: runtime.GOOS + "/" + runtime.GOARCH, Traffic: map[string]traffic.Report{}}}
 	t.Cleanup(func() { f.saveReport(t) })
-	f.controller = startController(t, root)
+	f.controller = startController(t, root, binary)
 	t.Cleanup(func() { f.cleanup(t) })
 	f.topologyFixture(t)
 	for _, phase := range []struct {
@@ -22,7 +22,8 @@ func TestNativeFleetLifecycle(t *testing.T) {
 		run  func(*testing.T)
 	}{{"initial", f.initial}, {"update", f.update}, {"activation-rollback", f.rollback},
 		{"installer-interruption", f.interrupt},
-		{"controller-outage", f.outage}, {"agent-crash", f.crash}, {"revocation", f.revoke}} {
+		{"controller-outage", f.outage}, {"agent-crash", f.crash},
+		{"controller-crash", f.controllerCrash}, {"revocation", f.revoke}} {
 		if !t.Run(phase.name, phase.run) {
 			return
 		}

@@ -1,11 +1,11 @@
 package acceptance
 
 import (
-	"crypto/tls"
-	"net/http/httptest"
+	"os"
+	"os/exec"
 
-	"vpn-script/internal/control/fleet/registry"
 	"vpn-script/internal/control/integration/traffic"
+	"vpn-script/internal/core/fleet/wire"
 	"vpn-script/internal/core/model"
 	"vpn-script/internal/platform/fleetapi"
 )
@@ -16,13 +16,17 @@ const nodeBase = "/opt/vpn-nhop"
 const nodeUnit = "/etc/systemd/system/vpn-nhop.service"
 
 type controller struct {
-	root        string
-	store       *registry.Store
-	server      *httptest.Server
-	certificate tls.Certificate
-	address     string
-	client      *fleetapi.Client
-	admin       string
+	root     string
+	binary   string
+	address  string
+	endpoint string
+	ca       []byte
+	client   *fleetapi.Client
+	admin    string
+	child    *exec.Cmd
+	done     chan error
+	log      *os.File
+	starts   int
 }
 
 type fixture struct {
@@ -53,6 +57,31 @@ type report struct {
 	RevokeNoRestart      bool                      `json:"revoke_no_restart"`
 	RemovedStateRetained bool                      `json:"removed_state_retained"`
 	Interruption         *interruptionReport       `json:"installer_interruption,omitempty"`
+	ControllerCrash      *controllerCrashReport    `json:"controller_crash,omitempty"`
+}
+
+type controllerCrashReport struct {
+	BeforeSHA256 string `json:"before_sha256"`
+	AfterSHA256  string `json:"after_sha256"`
+	PID          int    `json:"pid"`
+	Signal       string `json:"signal"`
+	SignalNumber int    `json:"signal_number"`
+	Signaled     bool   `json:"signaled"`
+	Offline      bool   `json:"offline_verified"`
+	Recovered    bool   `json:"recovered"`
+}
+
+type controllerSnapshot struct {
+	PID                   int               `json:"pid"`
+	AgentPID              string            `json:"agent_pid"`
+	VPNPID                string            `json:"vpn_pid"`
+	Active                wire.Node         `json:"active"`
+	Revoked               wire.Node         `json:"revoked"`
+	Hashes                map[string]string `json:"hashes"`
+	AssignmentSHA256      string            `json:"assignment_sha256"`
+	RevokedAssignmentHTTP int               `json:"revoked_assignment_http"`
+	RevokedReportHTTP     int               `json:"revoked_report_http"`
+	RevokedEnrollHTTP     int               `json:"revoked_enroll_http"`
 }
 
 type interruptionReport struct {

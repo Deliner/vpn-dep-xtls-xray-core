@@ -2,14 +2,22 @@ package acceptance
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
+	contract "vpn-script/internal/core/fleet"
+	"vpn-script/internal/core/fleet/wire"
 	"vpn-script/internal/core/model"
+	"vpn-script/internal/node/fleet/service"
 	"vpn-script/internal/node/installer"
 	"vpn-script/internal/node/release"
+	"vpn-script/internal/platform/fleetapi"
 	"vpn-script/internal/platform/safeio"
 )
 
@@ -66,4 +74,66 @@ func (f *fixture) saveReport(t *testing.T) {
 	if err := safeio.JSON(os.Getenv("NHOP_FLEET_REPORT"), f.report); err != nil {
 		t.Error(err)
 	}
+}
+
+func (f *fixture) controllerSnapshot(t *testing.T, name string, revoked wire.Enrollment) controllerSnapshot {
+	t.Helper()
+	c := f.controller
+	value := controllerSnapshot{PID: c.child.Process.Pid, Hashes: map[string]string{},
+		AgentPID: property(t, service.Name, "MainPID"), VPNPID: property(t, "vpn-nhop.service", "MainPID")}
+	var err error
+	value.Active, err = c.client.Node(t.Context(), nodeID, c.admin)
+	require(t, err)
+	value.Revoked, err = c.client.Node(t.Context(), revoked.NodeID, c.admin)
+	require(t, err)
+	value.RevokedAssignmentHTTP, value.RevokedReportHTTP, value.RevokedEnrollHTTP = c.denied(t, revoked)
+	for key, path := range map[string]string{"authority": filepath.Join(c.root, "authority.json"), "admin": filepath.Join(c.root, "admin-credential.json"),
+		"tls_certificate": filepath.Join(c.root, "ca.pem"), "tls_key": filepath.Join(c.root, "key.pem"), "agent_credentials": filepath.Join(agentState, "connection.json")} {
+		value.Hashes[key], err = safeio.FileHash(path)
+		require(t, err)
+	}
+	executable, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", value.PID))
+	require(t, err)
+	if executable != f.binary {
+		t.Fatal("controller process is not executing the supplied Fleet binary")
+	}
+	value.Hashes["executable"], err = safeio.FileHash(executable)
+	require(t, err)
+	value.AssignmentSHA256 = f.controllerAssignment(t, name, value.Active)
+	require(t, safeio.NewJSON(filepath.Join(f.root, "reports", "controller-"+name+".json"), value))
+	return value
+}
+
+func (f *fixture) controllerAssignment(t *testing.T, name string, node wire.Node) string {
+	t.Helper()
+	var connection struct {
+		Credential string         `json:"credential"`
+		Trust      contract.Trust `json:"trust"`
+	}
+	raw, err := safeio.Read(filepath.Join(agentState, "connection.json"), 1<<20)
+	require(t, err)
+	require(t, json.Unmarshal(raw, &connection))
+	raw, err = f.controller.client.Assignment(t.Context(), nodeID, connection.Credential)
+	require(t, err)
+	_, receipt, err := contract.Accept(raw, connection.Trust, contract.Receipt{}, time.Now())
+	require(t, err)
+	if safeio.Hash(raw) != node.Desired.EnvelopeSHA256 || receipt.Revision != node.Desired.Revision || receipt.PayloadSHA256 != node.Desired.PayloadSHA256 {
+		t.Fatal("controller returned a different signed assignment")
+	}
+	require(t, safeio.Atomic(filepath.Join(f.root, "reports", "controller-"+name+"-assignment.json"), raw, 0600))
+	return safeio.Hash(raw)
+}
+
+func (c *controller) denied(t *testing.T, value wire.Enrollment) (int, int, int) {
+	t.Helper()
+	_, assignmentErr := c.client.Assignment(t.Context(), value.NodeID, value.Credential)
+	reportErr := c.client.Report(t.Context(), value.Credential, wire.Status{FleetID: "acceptance", NodeID: value.NodeID, Phase: "waiting"})
+	_, enrollErr := c.client.Enroll(t.Context(), value)
+	for _, err := range []error{assignmentErr, reportErr, enrollErr} {
+		var failure *fleetapi.HTTPError
+		if !errors.As(err, &failure) || failure.Status != 403 {
+			t.Fatal("revoked identity was not rejected with HTTP 403", err)
+		}
+	}
+	return 403, 403, 403
 }

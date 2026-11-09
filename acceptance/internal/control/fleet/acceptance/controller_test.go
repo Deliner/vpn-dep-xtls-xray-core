@@ -2,61 +2,40 @@ package acceptance
 
 import (
 	"context"
-	"crypto/tls"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
 	"net"
-	"net/http/httptest"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"vpn-script/internal/control/fleet/registry"
-	"vpn-script/internal/control/fleet/server"
 	"vpn-script/internal/core/fleet/wire"
 	"vpn-script/internal/core/model"
 	"vpn-script/internal/node/fleet/pull"
 	"vpn-script/internal/platform/credential"
-	"vpn-script/internal/platform/fleetapi"
 	"vpn-script/internal/platform/safeio"
 )
 
-func startController(t *testing.T, root string) *controller {
+func (c *controller) authority(t *testing.T) {
 	t.Helper()
-	c := &controller{root: filepath.Join(root, "controller")}
-	require(t, registry.Initialize(c.root, "acceptance"))
-	var err error
-	c.store, err = registry.Open(c.root)
+	public, private, err := ed25519.GenerateKey(rand.Reader)
 	require(t, err)
-	c.server = httptest.NewTLSServer(server.New(c.store, nil))
-	c.address, c.certificate = c.server.Listener.Addr().String(), c.server.TLS.Certificates[0]
-	ca := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: c.server.Certificate().Raw})
-	c.client, err = fleetapi.New(c.server.URL, ca)
+	cert := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Owned Fleet acceptance"},
+		NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(4 * time.Hour),
+		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1)}, IsCA: true, BasicConstraintsValid: true,
+		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	der, err := x509.CreateCertificate(rand.Reader, cert, cert, public, private)
 	require(t, err)
-	c.admin, err = registry.ReadAdminCredential(filepath.Join(c.root, "admin-credential.json"))
+	key, err := x509.MarshalPKCS8PrivateKey(private)
 	require(t, err)
-	t.Cleanup(func() { c.close(t) })
-	return c
-}
-
-func (c *controller) close(t *testing.T) {
-	t.Helper()
-	c.client.Close()
-	c.server.Close()
-	require(t, c.store.Close())
-}
-
-func (c *controller) reopen(t *testing.T) {
-	t.Helper()
-	var err error
-	c.store, err = registry.Open(c.root)
-	require(t, err)
-	listener, err := net.Listen("tcp", c.address)
-	require(t, err)
-	c.server = httptest.NewUnstartedServer(server.New(c.store, nil))
-	require(t, c.server.Listener.Close())
-	c.server.Listener = listener
-	c.server.TLS = &tls.Config{Certificates: []tls.Certificate{c.certificate}, MinVersion: tls.VersionTLS13}
-	c.server.StartTLS()
+	c.ca = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	for name, raw := range map[string][]byte{"ca.pem": c.ca, "key.pem": pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: key})} {
+		require(t, safeio.Atomic(filepath.Join(c.root, name), raw, 0600))
+	}
 }
 
 func (f *fixture) enroll(t *testing.T) {
@@ -64,8 +43,7 @@ func (f *fixture) enroll(t *testing.T) {
 	c := f.controller
 	invite, err := c.client.Invite(t.Context(), c.admin, wire.Invite{NodeID: nodeID, Group: "canary", ValiditySeconds: 600})
 	require(t, err)
-	bootstrap := pull.Bootstrap{Version: 1, Endpoint: c.server.URL, Invitation: invite,
-		CAPEM: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: c.certificate.Certificate[0]})}
+	bootstrap := pull.Bootstrap{Version: 1, Endpoint: c.endpoint, Invitation: invite, CAPEM: c.ca}
 	path := filepath.Join(f.root, "bootstrap.json")
 	require(t, safeio.NewJSON(path, bootstrap))
 	f.cli(t, "agent-init", "--state", agentState, "--bootstrap", path)
