@@ -3,6 +3,7 @@ set -euo pipefail
 [[ $# == 3 ]] || exit 2
 collection="$1" commit="$2" source_root="$3"
 source "$(dirname "${BASH_SOURCE[0]}")/verify.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/interruption.sh"
 source "$source_root/ops/testing/acceptance/client/verify-inputs.sh"
 source "$source_root/ops/testing/acceptance/client/release.sh"
 for arch in amd64 arm64; do
@@ -21,6 +22,7 @@ for arch in amd64 arm64; do
   fleet_verify_build "$report/package/bin/nhop-fleet" "$arch" "$collection/fleet-$arch-build.txt"
   fleet_verify_build "$report/package/fleet.test" "$arch" "$collection/fleet-$arch-test-build.txt"
   fleet_verify_report "$report/package/reports/fleet.json" "$arch"
+  fleet_verify_interruption "$report/package/reports"
   digest="$(shasum -a 256 "$report/package/bin/nhop-fleet" | awk '{print $1}')"
   jq -e --arg hash "$digest" '.agent_sha256 == $hash and .supervisor_sha256 == $hash' "$report/package/reports/fleet.json" > /dev/null
   for name in xray sing-box libcronet.so; do
@@ -30,7 +32,7 @@ for arch in amd64 arm64; do
   client_verify_release_runtime "$source_root/ops/release/runtime" "$arch" "$report/package/reports/runtime/xray" \
     "$report/package/reports/runtime/sing-box" "$report/package/reports/runtime/libcronet.so" >> "$collection/fleet-$arch-integrity.log"
   log="$report/package/reports/fleet.log"
-  for phase in initial update activation-rollback controller-outage agent-crash revocation; do
+  for phase in initial update activation-rollback installer-interruption controller-outage agent-crash revocation; do
     awk -v p="--- PASS: TestNativeFleetLifecycle/$phase (" 'index($0,p) {n++} END {exit n!=1}' "$log"
   done
   awk '/^--- PASS: TestNativeFleetLifecycle \(/ {n++} /^PASS$/ {p++} /--- (FAIL|SKIP):|WARNING: DATA RACE/ {bad=1} END {exit bad || n!=1 || p!=1}' "$log"

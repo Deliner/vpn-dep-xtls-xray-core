@@ -48,7 +48,7 @@ if [[ "$suite" == cronet ]]; then
   exit 0
 fi
 if [[ "$suite" == fleet ]]; then
-  bash "$acceptance_root/ops/testing/acceptance/fleet/collect.sh" "$collection" "$acceptance_commit" "$acceptance_checkout/acceptance"
+  bash "$acceptance_checkout/acceptance/ops/testing/acceptance/fleet/collect.sh" "$collection" "$acceptance_commit" "$acceptance_checkout/acceptance"
   printf 'verified\n' > "$acceptance_output/status"
   printf 'Native Linux Fleet acceptance verified: %s\n' "$collection"
   exit 0

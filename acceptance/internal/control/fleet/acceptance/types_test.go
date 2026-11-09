@@ -52,4 +52,26 @@ type report struct {
 	RevokeExitStatus     string                    `json:"revoke_exit_status"`
 	RevokeNoRestart      bool                      `json:"revoke_no_restart"`
 	RemovedStateRetained bool                      `json:"removed_state_retained"`
+	Interruption         *interruptionReport       `json:"installer_interruption,omitempty"`
+}
+
+type interruptionReport struct {
+	AgentBefore       string `json:"agent_pid_before"`
+	AgentAfter        string `json:"agent_pid_after"`
+	ControlPID        int    `json:"systemd_control_pid"`
+	Signal            string `json:"signal"`
+	ExitStatus        string `json:"exit_status"`
+	UnitResult        string `json:"unit_result"`
+	PreviousRelease   string `json:"previous_release"`
+	NextRelease       string `json:"next_release"`
+	JournalSHA256     string `json:"journal_sha256"`
+	IntentBeforeSHA   string `json:"intent_before_sha256"`
+	IntentAfterSHA    string `json:"intent_after_sha256"`
+	CredentialsBefore string `json:"credentials_before_sha256"`
+	CredentialsAfter  string `json:"credentials_after_sha256"`
+	Revision          uint64 `json:"revision,string"`
+	PayloadSHA256     string `json:"payload_sha256"`
+	AttemptBefore     uint64 `json:"attempt_before,string"`
+	AttemptAfter      uint64 `json:"attempt_after,string"`
+	Recovered         bool   `json:"recovered"`
 }

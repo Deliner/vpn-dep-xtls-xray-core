@@ -10,6 +10,12 @@ sha256sum --check SHA256SUMS
 mkdir reports
 printf 'running\n' > reports/status
 trap 'result=$?; if ((result != 0)); then printf "failed\n" > "$bundle/reports/status"; fi' EXIT
+df -Pk /var/lib > reports/disk-before.txt
+available="$(awk 'NR == 2 {print $4}' reports/disk-before.txt)"
+if [[ ! "$available" =~ ^[0-9]+$ ]] || ((available < 1048576)); then
+  printf 'Fleet fixture requires at least 1 GiB free for retained releases, runtime cache and evidence.\n' >&2
+  exit 2
+fi
 stage="$(sudo -n mktemp -d /var/lib/nhop-fleet-acceptance-XXXXXXXX)"
 printf '%s\n' "$stage" > reports/guest-stage.txt
 sudo -n install -m 0700 -o 0 -g 0 bin/nhop-fleet "$stage/nhop-fleet"

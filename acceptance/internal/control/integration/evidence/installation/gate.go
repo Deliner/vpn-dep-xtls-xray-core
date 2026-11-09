@@ -33,6 +33,9 @@ func Gate(ctx context.Context) error {
 }
 
 func Ungate(ctx context.Context) error {
+	if err := OwnedHost(); err != nil {
+		return err
+	}
 	var failures []error
 	for _, path := range []string{gateFile, dropin} {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
@@ -41,6 +44,23 @@ func Ungate(ctx context.Context) error {
 	}
 	_, err := systemctl(ctx, "daemon-reload")
 	return errors.Join(append(failures, err)...)
+}
+
+// ObservePending verifies and records an installer running in another process.
+func ObservePending(ctx context.Context, previous, output string) (Report, error) {
+	if err := OwnedHost(); err != nil {
+		return Report{}, err
+	}
+	pid, err := waitForGate(ctx)
+	if err != nil {
+		return Report{}, err
+	}
+	report, err := pending(previous, output)
+	if err != nil {
+		return report, err
+	}
+	report.ControlPID, report.SubState = pid, "start-pre"
+	return report, nil
 }
 
 func systemctl(ctx context.Context, args ...string) ([]byte, error) {

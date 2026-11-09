@@ -21,6 +21,7 @@ func TestNativeFleetLifecycle(t *testing.T) {
 		name string
 		run  func(*testing.T)
 	}{{"initial", f.initial}, {"update", f.update}, {"activation-rollback", f.rollback},
+		{"installer-interruption", f.interrupt},
 		{"controller-outage", f.outage}, {"agent-crash", f.crash}, {"revocation", f.revoke}} {
 		if !t.Run(phase.name, phase.run) {
 			return

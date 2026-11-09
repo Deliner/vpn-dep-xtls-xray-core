@@ -32,15 +32,11 @@ func KillInstaller(ctx context.Context, args []string, previous, output string) 
 	defer collect(command)
 	gateContext, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	pid, err := waitForGate(gateContext)
-	if err != nil {
-		return Report{}, err
-	}
-	report, err := pending(previous, output)
+	report, err := ObservePending(gateContext, previous, output)
 	if err != nil {
 		return report, err
 	}
-	report.InstallerPID, report.ControlPID, report.SubState = command.Process.Pid, pid, "start-pre"
+	report.InstallerPID = command.Process.Pid
 	if err := command.Process.Kill(); err != nil {
 		return report, err
 	}
