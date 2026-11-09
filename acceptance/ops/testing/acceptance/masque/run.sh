@@ -7,6 +7,7 @@ export NHOP_NODE_CI="linux/$arch"
 source "$root/ops/testing/diagnostics/netem/context.sh"
 netem_native_identity
 [[ "${GITHUB_WORKSPACE:-}" == /* && "$root" == "$GITHUB_WORKSPACE/acceptance" ]] || exit 2
+source "$root/ops/runtime/integrity.sh"
 source "$root/ops/testing/diagnostics/netem/runtime.sh"
 source "$root/ops/testing/acceptance/masque/experiments.sh"
 report="$root/build/masque-acceptance"
