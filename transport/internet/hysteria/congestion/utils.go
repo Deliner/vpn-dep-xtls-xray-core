@@ -46,11 +46,9 @@ func UseBBR(conn *quic.Conn, profile bbr.Profile) {
 // controller with, given the size QUIC itself starts at and the guess derived
 // from the remote address.
 //
-// The seed must not exceed what QUIC actually starts at. If it does, the first
-// path MTU probe can land between the two: QUIC sees an increase and reports
-// it, but the controller sees a decrease, which it cannot represent. Taking the
-// smaller of the two keeps the address-based guess as a floor for connections
-// whose path we can't reason about, while never seeding above QUIC.
+// Start with a size supported by QUIC rather than relying on the next PMTU
+// notification to correct packet-sized congestion and pacing windows. Later
+// notifications can increase or decrease the size as the active path changes.
 func seedPacketSize(quicSize, byAddr congestion.ByteCount) congestion.ByteCount {
 	if quicSize <= 0 {
 		return byAddr

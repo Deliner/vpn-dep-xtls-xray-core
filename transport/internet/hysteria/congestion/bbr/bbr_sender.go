@@ -490,9 +490,11 @@ func (b *bbrSender) SetMaxDatagramSize(s congestion.ByteCount) {
 	if b.debug {
 		b.debugPrint("Max Datagram Size: %d", s)
 	}
-	if s < b.maxDatagramSize {
-		panic(fmt.Sprintf("congestion BUG: decreased max datagram size from %d to %d", b.maxDatagramSize, s))
+	if s <= 0 {
+		panic(fmt.Sprintf("congestion BUG: invalid max datagram size %d", s))
 	}
+	// Path MTU may decrease after establishment. Packet-sized bounds follow
+	// the new size; learned byte windows remain bounded without restarting BBR.
 	oldMinCongestionWindow := b.minCongestionWindow
 	oldInitialCongestionWindow := b.initialCongestionWindow
 	b.rescalePacketSizedWindows(s)
