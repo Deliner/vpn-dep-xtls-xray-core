@@ -4,7 +4,49 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
+
+type artifactWorkflow struct {
+	Jobs map[string]struct {
+		Steps []struct {
+			Uses string
+			If   string
+			With map[string]any
+		}
+	}
+}
+
+func TestProtocolWorkflowPreservesCompleteEvidenceAndCandidates(t *testing.T) {
+	raw, err := os.ReadFile("../../../ops/testing/acceptance/workflow.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow artifactWorkflow
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	paths := map[string]bool{"acceptance/build/acceptance-results": false, "acceptance/build/runtime-candidates": false}
+	for _, step := range workflow.Jobs["protocols"].Steps {
+		if !strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
+			continue
+		}
+		path, _ := step.With["path"].(string)
+		if seen, known := paths[path]; !known || seen {
+			t.Fatal("unexpected or duplicate artifact", path)
+		}
+		if step.If != "always()" || step.With["include-hidden-files"] != true || step.With["if-no-files-found"] != "error" {
+			t.Fatal("artifact must retain all evidence, including hidden files, on failure", path)
+		}
+		paths[path] = true
+	}
+	for path, found := range paths {
+		if !found {
+			t.Fatal("required artifact missing", path)
+		}
+	}
+}
 
 func TestRepeatPublicationReenablesOnlyThePreparedWorkflowBeforePush(t *testing.T) {
 	f := newFixture(t)

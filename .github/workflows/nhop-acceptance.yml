@@ -36,6 +36,7 @@ jobs:
         with:
           name: acceptance-linux-${{ matrix.arch }}
           path: acceptance/build/acceptance-results
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
       - name: Retain built candidates for reviewed release packaging

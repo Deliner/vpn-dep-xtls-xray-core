@@ -30,6 +30,9 @@ func Verify(policy Policy, input Inputs) (map[string]string, error) {
 			return nil, fmt.Errorf("missing required source input: %s", name)
 		}
 	}
+	if err := verifyTUICCandidate(policy, input, entries); err != nil {
+		return nil, err
+	}
 	if err := verifyCandidate(policy, input, target); err != nil {
 		return nil, err
 	}
@@ -37,6 +40,38 @@ func Verify(policy Policy, input Inputs) (map[string]string, error) {
 		return nil, err
 	}
 	return entries, nil
+}
+
+func verifyTUICCandidate(policy Policy, input Inputs, entries map[string]string) error {
+	if policy.Label != tuicLabel {
+		return nil
+	}
+	for _, name := range []string{"origin.txt", "sing-quic/LICENSE", "sing-quic/go.mod", "sing-quic/tuic/service.go", "sing-quic/tuic/server_listener.go"} {
+		if entries["source/nhop-dependencies/"+name] == "" {
+			return fmt.Errorf("TUIC release requires attributed dependency source: %s", name)
+		}
+	}
+	provenance, err := runtimerelease.ReadRegular(input.Candidate, "provenance.txt", 1_000_000)
+	if err != nil {
+		return err
+	}
+	const module = "github.com/sagernet/sing-quic"
+	const version = "v0.7.2-0.20261020082049-7e0a5869a5f4"
+	if err := requireLines(provenance, []string{"tuic_module=" + module, "tuic_version=" + version,
+		"tuic_upstream_sum=h1:QuhAb8QW0pKYmSvfj/nK91libunBwVJiWb852yidlxI=",
+		"tuic_source=source/nhop-dependencies/sing-quic", "tuic_patch_state=applied"}); err != nil {
+		return err
+	}
+	audit, err := runtimerelease.ReadRegular(input.Candidate, "audit/source.txt", 4_000_000)
+	if err != nil {
+		return err
+	}
+	const marker = "Conservative upstream identity scan: "
+	text := "\n" + string(audit)
+	if strings.Count(text, "\n"+marker) != 1 || !strings.Contains(text, "\n"+marker+module+"@"+version+"\n") {
+		return fmt.Errorf("TUIC source audit must include its exact upstream identity once")
+	}
+	return nil
 }
 
 // VerifyMetadata authenticates retained evidence before restoring files omitted

@@ -36,6 +36,8 @@ type Policy struct {
 	Targets   map[string]Target `json:"targets"`
 }
 
+const tuicLabel = "nhop-fork-cronet154-zlib-tuic-1"
+
 func Load(path string) (Policy, error) {
 	var policy Policy
 	raw, err := safeio.Read(path, 32768)
@@ -59,7 +61,7 @@ func (p Policy) valid() error {
 	if !ok || !commitSHA(commit) || !commitSHA(p.Workflow) || !validate.Hash(p.SourceSHA) {
 		return fmt.Errorf("release requires exact owned sing-box source and workflow")
 	}
-	if p.Version != "1.14.4" || p.Label != "nhop-fork-cronet154-zlib-1" || len(p.Targets) != 2 {
+	if p.Version != "1.14.4" || (p.Label != "nhop-fork-cronet154-zlib-1" && p.Label != tuicLabel) || len(p.Targets) != 2 {
 		return fmt.Errorf("unreviewed sing-box release generation")
 	}
 	if p.Run == "" || p.Run[0] == '0' || strings.Trim(p.Run, "0123456789") != "" {
