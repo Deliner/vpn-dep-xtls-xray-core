@@ -30,6 +30,12 @@ if [[ "$suite" == cronet ]]; then
       verification="$collection/cronet-native-$arch"
       [[ "$(cat "$verification/status")" == passed && -s "$verification/range.log" ]] || exit 1
       (cd "$verification"; shasum -a 256 --check evidence.sha256) > "$verification/integrity-verification.log"
+      if [[ -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet/zlib.sh" ]]; then
+        [[ "$(cat "$verification/zlib-window/status")" == passed ]] || exit 1
+        [[ "$(wc -l < "$verification/zlib-window/results.tsv" | tr -d ' ')" == 9 ]] || exit 1
+        grep -Fxq 'patch_state=current-source-fixed' "$verification/zlib-window/provenance.txt" || exit 1
+        (cd "$verification/zlib-window"; shasum -a 256 --check evidence.sha256) >> "$verification/integrity-verification.log"
+      fi
       if [[ -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet-payload.sh" || -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet/payload.sh" ]]; then
         [[ "$(cat "$verification/naive/status")" == passed ]] || exit 1
         (cd "$verification/naive"; shasum -a 256 --check evidence.sha256; shasum -a 256 --check runtime.sha256) >> "$verification/integrity-verification.log"

@@ -38,6 +38,11 @@ cronet-build target output:
 cronet-range-test candidate:
     @bash ops/quality/check.sh static-analysis bash ops/testing/cronet/range.sh "$1"
 
+# Reproduce the zlib dictionary bound defect and verify a private patch under ASan/UBSan; no network changes.
+[group('runtime')]
+cronet-zlib-window-test output:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/cronet/zlib/run.sh "$1"
+
 # Reproduce TUIC's missing QUIC shutdown on the exact locked graph, then race-test the local patch.
 [group('runtime')]
 tuic-shutdown-test output:
