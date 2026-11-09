@@ -56,7 +56,8 @@ func publishOverlay(output string, changes []sourceChange, policy string) error 
 		return err
 	}
 	return safeio.JSON(filepath.Join(output, "probe.json"), map[string]any{
-		"schema_version": 4, "kind": "diagnostic-only", "queue_policy": policy,
-		"default_queue_limit": 32, "sources": observations,
+		"schema_version": 6, "kind": "diagnostic-only", "queue_policy": policy,
+		"connection_queue_policy": connectionQueuePolicy(changes),
+		"default_queue_limit":     32, "default_connection_queue_limit": 128, "sources": observations,
 	})
 }

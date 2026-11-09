@@ -68,6 +68,15 @@ for arch in amd64 arm64; do
   fi
   (cd "$report"; shasum -a 256 --check evidence.sha256) > "$report/integrity-verification.log"
   started="$(cat "$report/started-unix")"
+  if grep -Fq 'quic-datagram-regressions.log' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
+    grep -Fq 'all modules verified' "$report/quic-module-integrity.log" || exit 1
+    for regression in TestNHOPDatagramBudgetConfigCopies TestNHOPDatagramBudgetConfigRejectsInvalidBounds \
+      TestNHOPDatagramBudgetDefaultsRemainLocal TestNHOPDatagramReceiveBudgetBounds \
+      TestNHOPDatagramReceiveBudgetRejectsWithoutAllocation TestNHOPDatagramReceiveRingWrap \
+      TestNHOPDatagramReceiveBudgetConcurrentUse TestNHOPConnectionDatagramBurst; do
+      grep -Fq -- "--- PASS: $regression (" "$report/quic-datagram-regressions.log" || exit 1
+    done
+  fi
   just payload-report "$report/payload" '1,3' "$started" "linux/$arch" '127.0.0.1'
   for scenario in ipv6-single ipv6-chain mixed-6-4-6 mixed-4-6-4; do
     hops=3

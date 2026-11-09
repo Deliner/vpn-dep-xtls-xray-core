@@ -22,6 +22,101 @@ func (s *stream) enqueueDatagram(data []byte) {
 }
 `
 
+const datagramFixture = `package quic
+import (
+	"context"
+)
+const maxDatagramRcvQueueLen = 128
+func (h *datagramQueue) HandleDatagramFrame(f *wire.DatagramFrame) {
+	data := make([]byte, len(f.Data))
+	copy(data, f.Data)
+	var queued bool
+	h.rcvMx.Lock()
+	if len(h.rcvQueue) < maxDatagramRcvQueueLen {
+		h.rcvQueue = append(h.rcvQueue, data)
+		queued = true
+	}
+	h.rcvMx.Unlock()
+	if !queued && h.logger.Debug() {
+		h.logger.Debugf("discarded")
+	}
+}
+func (h *datagramQueue) Receive(ctx context.Context) {
+	h.rcvMx.Lock()
+	h.rcvMx.Unlock()
+}
+`
+
+func TestConnectionProbePreservesAdmissionAndBoundsObservation(t *testing.T) {
+	source := []byte(datagramFixture)
+	modified, err := instrumentDatagramQueue(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invariant := range []string{"const maxDatagramRcvQueueLen = 128", "len(h.rcvQueue) < maxDatagramRcvQueueLen", "h.rcvQueue = append(h.rcvQueue, data)", "data[:min(96, len(data))]", "if !queued && h.logger.Debug()"} {
+		if bytes.Count(modified, []byte(invariant)) != 1 {
+			t.Fatalf("changed admission or missing bounded observation: %s", invariant)
+		}
+	}
+	if string(source) != datagramFixture || bytes.Count(modified, []byte("nhopQueued :=")) != 1 {
+		t.Fatal("probe mutated input or instrumented an unrelated receive lock")
+	}
+	if _, err := instrumentDatagramQueue(modified); err == nil {
+		t.Fatal("accepted duplicate instrumentation")
+	}
+}
+
+func TestConnectionProbeRejectsChangedSourceAndExistingControl(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "datagram_queue.go")
+	if err := os.WriteFile(path, []byte(datagramFixture), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := instrumentVerifiedReceive(path); err == nil {
+		t.Fatal("accepted unreviewed connection queue source")
+	}
+	if _, err := prepareReceiveControl(path, datagramQueueSource); err == nil {
+		t.Fatal("accepted existing control target")
+	}
+	if _, err := prepareReceiveControl(path+".absent", "unreviewed"); err == nil {
+		t.Fatal("accepted unreviewed queue policy")
+	}
+	actual, err := os.ReadFile(path)
+	if err != nil || string(actual) != datagramFixture {
+		t.Fatal("rejected observation changed source")
+	}
+}
+
+func TestConfiguredConnectionProbePreservesBothBudgets(t *testing.T) {
+	fixture := strings.Replace(datagramFixture, "len(h.rcvQueue) < maxDatagramRcvQueueLen", "h.rcvQueue.Len() < h.rcvMaxPackets && len(f.Data) <= h.rcvMaxBytes-h.rcvBytes", 1)
+	fixture = strings.Replace(fixture, "h.rcvQueue = append(h.rcvQueue, data)", "h.rcvQueue.PushBack(data)", 1)
+	modified, err := instrumentBudgetDatagramQueue([]byte(fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invariant := range []string{"h.rcvQueue.Len() < h.rcvMaxPackets", "len(f.Data) <= h.rcvMaxBytes-h.rcvBytes", "h.rcvQueue.PushBack(data)", "nhopBuffered := h.rcvBytes", "f.Data[:min(96, len(f.Data))]"} {
+		if bytes.Count(modified, []byte(invariant)) != 1 {
+			t.Fatalf("lost budget or observation: %s", invariant)
+		}
+	}
+	if _, err := instrumentBudgetDatagramQueue(modified); err == nil {
+		t.Fatal("accepted repeated budget instrumentation")
+	}
+}
+
+func TestConnectionControlsMatchReviewedConstructorAndPolicy(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "control.go")
+	for _, digest := range []string{datagramQueueSource, datagramBudgetSource} {
+		control, err := prepareReceiveControl(path, digest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		configured := digest == datagramBudgetSource
+		if bytes.Contains(control, []byte("utils.DefaultLogger, nil)")) != configured || bytes.Contains(control, []byte("TestNHOPReceiveQueueConfiguredBudget")) != configured {
+			t.Fatal("control constructor or budget policy differs from source version")
+		}
+	}
+}
+
 func TestProbeRetainsQueueBoundAndNormalEnqueue(t *testing.T) {
 	data := []byte(queueFixture)
 	modified, err := instrumentMasqueQueue(data)

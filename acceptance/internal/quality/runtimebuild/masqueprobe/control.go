@@ -3,7 +3,93 @@ package masqueprobe
 import (
 	"fmt"
 	"os"
+	"strings"
 )
+
+func prepareReceiveControl(path, sourceSHA string) ([]byte, error) {
+	if _, err := os.Lstat(path); !os.IsNotExist(err) {
+		return nil, fmt.Errorf("diagnostic control target must be absent: %s", path)
+	}
+	switch sourceSHA {
+	case datagramQueueSource:
+		return []byte(receiveControl), nil
+	case datagramBudgetSource:
+		legacy := strings.Replace(receiveControl, "utils.DefaultLogger)", "utils.DefaultLogger, nil)", 1)
+		return []byte(legacy + receiveBudgetControl), nil
+	default:
+		return nil, fmt.Errorf("unreviewed QUIC receive policy")
+	}
+}
+
+const receiveBudgetControl = `
+func TestNHOPReceiveQueueConfiguredBudget(t *testing.T) {
+	config := &Config{}
+	if err := config.SetDatagramReceiveBuffer(2, 6); err != nil {
+		t.Fatal(err)
+	}
+	queue := newDatagramQueue(func() {}, utils.DefaultLogger, config)
+	for _, data := range []string{"abc", "def", "g"} {
+		queue.HandleDatagramFrame(&wire.DatagramFrame{Data: []byte(data)})
+	}
+	actual, err := queue.Receive(context.Background())
+	if err != nil || string(actual) != "abc" {
+		t.Fatalf("packet limit changed retained data: %x %v", actual, err)
+	}
+	queue.HandleDatagramFrame(&wire.DatagramFrame{Data: []byte("toolong")})
+	actual, err = queue.Receive(context.Background())
+	if err != nil || string(actual) != "def" {
+		t.Fatalf("byte limit changed retained data: %x %v", actual, err)
+	}
+	queue.CloseWithError(io.EOF)
+	if _, err := queue.Receive(context.Background()); err != io.EOF {
+		t.Fatalf("budget accepted rejected data or lost close: %v", err)
+	}
+	fmt.Println("NHOP_QUIC_CONFIGURED_POLICY packets=2 bytes=6 drops=2 preserved=true")
+}
+`
+
+// Fill the real connection queue, force bounded drops, then verify independent
+// copies, FIFO, recovery and close. The marker check belongs to the build recipe.
+const receiveControl = `package quic
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"testing"
+
+	"github.com/apernet/quic-go/internal/utils"
+	"github.com/apernet/quic-go/internal/wire"
+)
+
+func TestNHOPReceiveQueueOverflow(t *testing.T) {
+	queue := newDatagramQueue(func() {}, utils.DefaultLogger)
+	for sequence := range maxDatagramRcvQueueLen {
+		data := []byte{byte(sequence)}
+		queue.HandleDatagramFrame(&wire.DatagramFrame{Data: data})
+		data[0] = 0xff
+	}
+	queue.HandleDatagramFrame(&wire.DatagramFrame{Data: bytes.Repeat([]byte{0xab}, 128)})
+	queue.HandleDatagramFrame(&wire.DatagramFrame{Data: []byte{0xff}})
+	for sequence := range maxDatagramRcvQueueLen {
+		actual, err := queue.Receive(context.Background())
+		if err != nil || !bytes.Equal(actual, []byte{byte(sequence)}) {
+			t.Fatalf("receive copy/FIFO at %d: %x %v", sequence, actual, err)
+		}
+	}
+	queue.HandleDatagramFrame(&wire.DatagramFrame{Data: []byte("after-overflow")})
+	actual, err := queue.Receive(context.Background())
+	if err != nil || string(actual) != "after-overflow" {
+		t.Fatalf("queue failed to recover after overflow: %x %v", actual, err)
+	}
+	queue.CloseWithError(io.EOF)
+	if _, err := queue.Receive(context.Background()); err != io.EOF {
+		t.Fatalf("queue did not preserve close: %v", err)
+	}
+	fmt.Println("NHOP_QUIC_RECEIVE_POLICY limit=128 drops=2 fifo=true copy=true recovery=true close=true")
+}
+`
 
 func prepareSendControl(path, sourceSHA string) ([]byte, error) {
 	if _, err := os.Lstat(path); !os.IsNotExist(err) {

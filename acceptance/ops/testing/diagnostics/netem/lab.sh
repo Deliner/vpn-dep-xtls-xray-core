@@ -22,6 +22,7 @@ cp "$probe/provenance.txt" "$probe/control.log" "$probe/probe.json" "$run/experi
 if [[ -f "$probe/send-control.log" ]]; then cp "$probe/send-control.log" "$run/experiment/"; fi
 if [[ -f "$probe/packet-control.log" ]]; then cp "$probe/packet-control.log" "$run/experiment/"; fi
 if [[ -f "$probe/device-control.log" ]]; then cp "$probe/device-control.log" "$run/experiment/"; fi
+if [[ -f "$probe/receive-control.log" ]]; then cp "$probe/receive-control.log" "$run/experiment/"; fi
 cp ops/testing/diagnostics/netem/guest.sh ops/testing/diagnostics/netem/namespace.sh "$run/experiment/"
 printf '%s\n' "$2" > "$run/experiment/cycles"
 printf '%s\n' "$3" > "$run/experiment/workers"

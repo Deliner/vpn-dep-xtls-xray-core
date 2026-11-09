@@ -41,6 +41,21 @@ if ! go -C "$base/source" test -modfile "$output/probe.mod" -overlay "$output/ov
   cat "$output/control.log" >&2
   exit 1
 fi
+if ! CGO_ENABLED=1 go -C "$base/source" test -race -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
+  github.com/apernet/quic-go -run '^(TestDatagramQueue|TestNHOPReceiveQueue)' -count=1 -v > "$output/receive-control.log" 2>&1; then
+  cat "$output/receive-control.log" >&2
+  exit 1
+fi
+receive_drops=2
+if grep -q '^NHOP_QUIC_CONFIGURED_POLICY packets=2 bytes=6 drops=2 preserved=true$' "$output/receive-control.log"; then
+  receive_drops=4
+  grep -Eq '^NHOP_QUIC_QUEUE_DROP .*buffered=6 budget=6 queued=2 limit=2 bytes=1 prefix=67$' "$output/receive-control.log"
+  grep -Eq '^NHOP_QUIC_QUEUE_DROP .*buffered=3 budget=6 queued=1 limit=2 bytes=7 prefix=746f6f6c6f6e67$' "$output/receive-control.log"
+fi
+[[ "$(grep -c '^NHOP_QUIC_QUEUE_DROP ' "$output/receive-control.log")" == "$receive_drops" ]]
+grep -Eq '^NHOP_QUIC_QUEUE_DROP .*queued=128 limit=128 bytes=128 prefix=(ab){96}$' "$output/receive-control.log"
+grep -Eq '^NHOP_QUIC_QUEUE_DROP .*queued=128 limit=128 bytes=1 prefix=ff$' "$output/receive-control.log"
+grep -q '^NHOP_QUIC_RECEIVE_POLICY limit=128 drops=2 fifo=true copy=true recovery=true close=true$' "$output/receive-control.log"
 if ! go -C "$base/source" test -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
   github.com/apernet/quic-go -run '^(TestSendQueue|TestNHOPSendQueueSizeDrop)' -count=1 -v > "$output/send-control.log" 2>&1; then
   cat "$output/send-control.log" >&2
@@ -93,7 +108,7 @@ done
 mkdir "$output/bin"
 GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 go -C "$base/source" build \
   -trimpath -buildvcs=false -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
-  -ldflags '-s -w -buildid= -X github.com/xtls/xray-core/core.build=nhop-diagnostic-masque-4' \
+  -ldflags '-s -w -buildid= -X github.com/xtls/xray-core/core.build=nhop-diagnostic-masque-6' \
   -o "$output/bin/xray" ./main
 go -C "$base/source" mod verify
 candidate_inventory "$base" > "$output/input.after.sha256"
@@ -101,12 +116,12 @@ cmp "$output/input.before.sha256" "$output/input.after.sha256"
 (cd "$output/dependency"; find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) > "$output/dependency.after.sha256"
 cmp "$output/dependency.before.sha256" "$output/dependency.after.sha256"
 {
-  printf 'kind=diagnostic-only\nprobe_label=nhop-diagnostic-masque-4\nbase_candidate=%s\ntarget=%s\n' "$base" "$target"
+  printf 'kind=diagnostic-only\nprobe_label=nhop-diagnostic-masque-6\nbase_candidate=%s\ntarget=%s\n' "$base" "$target"
   cat "$base/provenance.txt"
   go version -m "$output/bin/xray"
   shasum -a 256 "$root/ops/runtime/masque-probe.sh" "$root/cmd/masqueprobe/main.go" "$root"/internal/quality/runtimebuild/masqueprobe/*.go
   shasum -a 256 "$root"/internal/quality/runtimebuild/masqueprobe/packettrace/*.go
 } > "$output/provenance.txt"
-(cd "$output"; shasum -a 256 bin/xray overlay/* overlay.json probe.json probe.mod probe.sum provenance.txt control.log send-control.log packet-control.log device-control.log input.*.sha256 dependency.*.sha256) > "$output/SHA256SUMS"
+(cd "$output"; shasum -a 256 bin/xray overlay/* overlay.json probe.json probe.mod probe.sum provenance.txt control.log receive-control.log send-control.log packet-control.log device-control.log input.*.sha256 dependency.*.sha256) > "$output/SHA256SUMS"
 printf 'diagnostic-built\n' > "$output/status"
 printf 'Diagnostic only, logs dropped prefixes and inner TCP headers: %s/bin/xray\nUse only with synthetic lab traffic.\n' "$output"

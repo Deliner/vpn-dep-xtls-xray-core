@@ -31,6 +31,10 @@ done
 xray_source="$root/build/runtime-candidates/xray-linux-$arch/source"
 just dependency-test "$xray_source" ./transport/internet/masque/... > "$report/xray-masque-regressions.log" 2>&1
 (cd "$xray_source/.."; sha256sum --check SHA256SUMS) > "$report/xray-regressions-integrity.log"
+quic_source="$(go -C "$xray_source" list -m -f '{{.Dir}}' github.com/apernet/quic-go)"
+GOFLAGS=-mod=readonly just dependency-test "$quic_source" . Test > "$report/quic-datagram-regressions.log" 2>&1
+GOFLAGS=-mod=readonly just dependency-test "$quic_source" ./integrationtests/self '^TestNHOPConnectionDatagramBurst$' >> "$report/quic-datagram-regressions.log" 2>&1
+go -C "$xray_source" mod verify > "$report/quic-module-integrity.log"
 xray="$root/build/runtime-candidates/xray-linux-$arch/bin/xray"
 singbox="$root/build/runtime-candidates/sing-box-linux-$arch/bin/sing-box"
 NHOP_IPV6_ACCEPTANCE=1 just payload "$xray" "$singbox" Test "$report/payload" > "$report/payload.log" 2>&1
