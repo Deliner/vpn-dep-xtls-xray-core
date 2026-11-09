@@ -2,7 +2,7 @@ module github.com/xtls/xray-core
 
 go 1.27
 
-replace github.com/apernet/quic-go => github.com/Deliner/vpn-dep-apernet-quic-go v0.61.1-0.20261109022443-5b04709112a4
+replace github.com/apernet/quic-go => github.com/Deliner/vpn-dep-apernet-quic-go v0.61.1-0.20261109033109-84023edbb399
 
 require (
 	github.com/apernet/quic-go v0.61.1-0.20260806010916-184d081eef3e
