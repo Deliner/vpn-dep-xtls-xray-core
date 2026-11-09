@@ -1,0 +1,5 @@
+repository	Deliner/vpn-dep-sagernet-cronet-go
+tag	nhop-cronet-zlib-1
+target	2a2edeed09868c916d273acd78d5d5cf685e8c07
+cronet-go	619c37373f297d961db92106d8d515a3063058562df04d3d1d1c4e8f9523ee7f
+naiveproxy	07971d320956a1ad1df6077746c7adba0fccdb88200c005eceac484c8184c43c

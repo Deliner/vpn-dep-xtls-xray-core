@@ -1,4 +1,4 @@
-name: N-hop node installer acceptance
+name: N-hop native acceptance
 
 on:
   push:
@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  installer:
-    name: Native node installer ${{ matrix.arch }}
+  protocols:
+    name: Native Linux ${{ matrix.arch }}
     strategy:
       fail-fast: false
       matrix:
@@ -19,7 +19,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,18 +27,22 @@ jobs:
       - name: Bootstrap pinned tools
         working-directory: acceptance
         run: bash ops/environment/bootstrap.sh
-      - name: Install node acceptance prerequisites
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y iproute2 tcpdump curl ca-certificates
-      - name: Install, upgrade, interrupt and recover the real node service
+      - name: Build, audit and execute the complete native matrix
         working-directory: acceptance
-        run: build/tools/bin/just acceptance-installer-run '${{ matrix.arch }}'
-      - name: Retain installer evidence even on failure
+        run: build/tools/bin/just acceptance-run '${{ matrix.arch }}'
+      - name: Retain complete results even when acceptance fails
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: installer-linux-${{ matrix.arch }}
-          path: acceptance/build/installer-acceptance
+          name: acceptance-linux-${{ matrix.arch }}
+          path: acceptance/build/acceptance-results
+          if-no-files-found: error
+          retention-days: 30
+      - name: Retain built candidates for reviewed release packaging
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: runtime-linux-${{ matrix.arch }}
+          path: acceptance/build/runtime-candidates
           if-no-files-found: error
           retention-days: 30

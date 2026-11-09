@@ -39,3 +39,38 @@ runtime-release-verify directory:
 [group('release')]
 runtime-release-publish directory:
     @bash ops/quality/check.sh static-analysis bash ops/release/runtime/publish.sh "$1"
+
+# Verify reviewed Cronet library bytes and complete native ABI/Naive/zlib evidence on both CPUs.
+[group('release')]
+cronet-release-verify collection:
+    @bash ops/quality/check.sh static-analysis go run ./cmd/runtimepack cronet-verify ops/release/runtime/cronet.json "$1"
+
+# Create immutable Cronet delivery archives after verifying both native targets.
+[group("release")]
+cronet-release-package collection output:
+    @bash ops/quality/check.sh static-analysis go run ./cmd/runtimepack cronet-package ops/release/runtime/cronet.json "$1" "$2"
+
+# Verify downloaded Cronet archives against the reviewed native library and evidence hashes.
+[group("release")]
+cronet-release-package-verify directory:
+    @bash ops/quality/check.sh static-analysis go run ./cmd/runtimepack cronet-package-verify ops/release/runtime/cronet.json "$1"
+
+# Package complete reviewed Cronet source inputs and their license texts without altering checkouts.
+[group('release')]
+cronet-release-sources output:
+    @bash ops/quality/check.sh static-analysis bash ops/release/runtime/cronet-sources.sh "$1"
+
+# Assemble reviewed Cronet binaries, full source archives and license notices into eleven assets.
+[group('release')]
+cronet-release-stage binaries sources output:
+    @bash ops/quality/check.sh static-analysis bash ops/release/runtime/cronet/stage.sh "$1" "$2" "$3"
+
+# Verify every downloaded Cronet publication asset against reviewed native inputs.
+[group('release')]
+cronet-release-verify-stage directory:
+    @bash ops/quality/check.sh static-analysis bash ops/release/runtime/cronet/verify.sh "$1"
+
+# MUTATES GITHUB: publish the owned Cronet prerelease after verifying downloaded draft assets; never overwrite.
+[group('release')]
+cronet-release-publish directory:
+    @bash ops/quality/check.sh static-analysis bash ops/release/runtime/cronet/publish.sh "$1"

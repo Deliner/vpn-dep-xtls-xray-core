@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 source "$recipe/cronet.sh"
+source "$recipe/native.sh"
 
 candidate_configure() {
   candidate_cronet_prepare
@@ -9,6 +10,8 @@ candidate_configure() {
   build_flags="-X github.com/sagernet/sing-box/constant.Version=$version $(cat "$work/source/release/LDFLAGS") -s -w -buildid="
   build_cgo=1
   if [[ "$target_os" == linux ]]; then
+    candidate_cronet_release
+    build_label=nhop-fork-cronet154-zlib-1
     build_tags+=,with_purego
     build_cgo=0
   elif [[ "$(go env GOHOSTOS)" != darwin ]]; then

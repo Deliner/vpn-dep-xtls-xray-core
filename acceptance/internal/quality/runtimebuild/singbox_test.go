@@ -14,7 +14,7 @@ func TestSingBoxConfigurationPreservesFullUpstreamFeatures(t *testing.T) {
 	work := filepath.Join(f.root, "work")
 	write(t, filepath.Join(work, "source/release/DEFAULT_BUILD_TAGS"), []byte(tags), 0600)
 	write(t, filepath.Join(work, "source/release/LDFLAGS"), []byte("-checklinkname=0"), 0600)
-	script := `source "$1"; candidate_cronet_prepare() { :; }; candidate_configure; printf '%s\n%s\n%s\n%s\n' "$build_package" "$build_tags" "$build_cgo" "$build_flags"`
+	script := `source "$1"; candidate_cronet_prepare() { :; }; candidate_cronet_release() { :; }; candidate_configure; printf '%s\n%s\n%s\n%s\n' "$build_package" "$build_tags" "$build_cgo" "$build_flags"`
 	command := exec.Command("bash", "-eu", "-c", script, "fixture", filepath.Join(f.root, "ops/runtime/sing-box/build.sh"))
 	command.Env = append(os.Environ(), "work="+work, "target_os=linux", "version=1.14.4", "recipe="+filepath.Join(f.root, "ops/runtime/sing-box"))
 	output, err := command.CombinedOutput()

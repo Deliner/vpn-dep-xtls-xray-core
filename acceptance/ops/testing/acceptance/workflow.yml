@@ -38,3 +38,11 @@ jobs:
           path: acceptance/build/acceptance-results
           if-no-files-found: error
           retention-days: 30
+      - name: Retain built candidates for reviewed release packaging
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: runtime-linux-${{ matrix.arch }}
+          path: acceptance/build/runtime-candidates
+          if-no-files-found: error
+          retention-days: 30

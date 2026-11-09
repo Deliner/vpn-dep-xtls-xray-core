@@ -1,0 +1,21 @@
+{
+  "workflow_sha": "d6ae6e6eb0fe7606eb07138244c6fc2ad1ef7fdc",
+  "run_id": "42637392545",
+  "source_pins_sha256": "1201b06c8371d5e5c32667da650379e2bc2c6cef06e0bd2b0702ef99d2a8d0db",
+  "targets": {
+    "amd64": {
+      "build_evidence_sha256": "e4ca057da6affc121aa288ae9a4ffea53458ffbf2f59efdd5c41cad2e8f73a3a",
+      "native_evidence_sha256": "a47f063a967e8b52d75e5681d1999c4d7193a408f6f069aab14f1014ff9ef7a7",
+      "library_sha256": "3af62b3defa63ce2e666ee197f84664975455496822528ce6d886de50a6a212e",
+      "naive_evidence_sha256": "4ffa01a1f9756dfdbf9f34d0acd769444d9fdf03fca1cd7864898f5f5da51708",
+      "zlib_evidence_sha256": "b0e5ec7f5ed5920e80caa1b5e1889c05d7b4a305a35074004f5a99664dfb00d7"
+    },
+    "arm64": {
+      "build_evidence_sha256": "b9d18e84fcb9b02e8ccf79118d1f52973574bcc2cf00f4b2647bcf91c519d2d5",
+      "native_evidence_sha256": "39d051fe95171f9eac7848fbbbff6e69ef1ae10e63e1e0500b534286fced86e5",
+      "library_sha256": "76225cdf2dad750ad3f8d9819d52ba325693883711cc3c1a97ef8fdbf6b6f2e4",
+      "naive_evidence_sha256": "2af451c843f8f9d8a14e745a447ad6107ad146116d879de3a7977aab06f3fd90",
+      "zlib_evidence_sha256": "76aaeff4a2d4f418d275840233916c8fecc54b3c4834c548db1f8d7e3dd700e0"
+    }
+  }
+}
