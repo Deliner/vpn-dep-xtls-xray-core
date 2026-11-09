@@ -1,0 +1,75 @@
+--- a/internal/ackhandler/sent_packet_handler.go
++++ b/internal/ackhandler/sent_packet_handler.go
+@@ -462,7 +462,7 @@
+ 	pnSpace.largestAcked = max(pnSpace.largestAcked, largestAcked)
+ 
+ 	h.observeMTUAcks(ackedPackets)
+-	h.detectLostPackets(rcvTime, encLevel)
++	discardedProbeBytes := h.detectLostPackets(rcvTime, encLevel)
+ 	h.ackedPacketsInfo = h.ackedPacketsInfo[:0]
+ 	if encLevel == protocol.Encryption1RTT {
+ 		h.detectLostPathProbes(rcvTime)
+@@ -487,7 +487,7 @@
+ 
+ 	if cex, ok := h.getCongestionControl().(congestion.SendAlgorithmEx); ok &&
+ 		(len(h.ackedPacketsInfo) != 0 || len(h.lostPacketsInfo) != 0) {
+-		cex.OnCongestionEventEx(priorInFlight, rcvTime, h.ackedPacketsInfo, h.lostPacketsInfo)
++		cex.OnCongestionEventEx(priorInFlight-discardedProbeBytes, rcvTime, h.ackedPacketsInfo, h.lostPacketsInfo)
+ 	}
+ 
+ 	// detect spurious losses for application data packets, if the ACK was not reordered
+@@ -827,7 +827,9 @@
+ 	}
+ }
+ 
+-func (h *sentPacketHandler) detectLostPackets(now monotime.Time, encLevel protocol.EncryptionLevel) {
++// detectLostPackets returns bytes discarded without a congestion signal. Extended
++// controllers must not retain these bytes in their ACK/loss batch accounting.
++func (h *sentPacketHandler) detectLostPackets(now monotime.Time, encLevel protocol.EncryptionLevel) (discardedProbeBytes protocol.ByteCount) {
+ 	h.lostPacketsInfo = h.lostPacketsInfo[:0]
+ 	pnSpace := h.getPacketNumberSpace(encLevel)
+ 	pnSpace.lossTime = 0
+@@ -900,21 +902,25 @@
+ 			pnSpace.history.DeclareLost(pn)
+ 			if !p.isPathProbePacket && p.IsAckEliciting() {
+ 				// the bytes in flight need to be reduced no matter if the frames in this packet will be retransmitted
++				if p.IsPathMTUProbePacket && p.includedInBytesInFlight {
++					discardedProbeBytes += p.Length
++				}
+ 				h.removeFromBytesInFlight(p)
+ 				h.queueFramesForRetransmission(p)
+ 				if !p.IsPathMTUProbePacket {
+ 					cc.OnCongestionEvent(pn, p.Length, priorInFlight)
++					h.lostPacketsInfo = append(h.lostPacketsInfo, congestionExt.LostPacketInfo{
++						PacketNumber: congestionExt.PacketNumber(pn),
++						BytesLost:    congestionExt.ByteCount(p.Length),
++					})
+ 				}
+-				h.lostPacketsInfo = append(h.lostPacketsInfo, congestionExt.LostPacketInfo{
+-					PacketNumber: congestionExt.PacketNumber(pn),
+-					BytesLost:    congestionExt.ByteCount(p.Length),
+-				})
+ 				if encLevel == protocol.Encryption1RTT && h.ecnTracker != nil {
+ 					h.ecnTracker.LostPacket(pn)
+ 				}
+ 			}
+ 		}
+ 	}
++	return discardedProbeBytes
+ }
+ 
+ func (h *sentPacketHandler) OnLossDetectionTimeout(now monotime.Time) error {
+@@ -938,11 +944,11 @@
+ 			})
+ 		}
+ 		// Early retransmit or time loss detection
+-		h.detectLostPackets(now, encLevel)
++		discardedProbeBytes := h.detectLostPackets(now, encLevel)
+ 
+ 		if cex, ok := h.getCongestionControl().(congestion.SendAlgorithmEx); ok &&
+ 			len(h.lostPacketsInfo) != 0 {
+-			cex.OnCongestionEventEx(priorInFlight, now, nil, h.lostPacketsInfo)
++			cex.OnCongestionEventEx(priorInFlight-discardedProbeBytes, now, nil, h.lostPacketsInfo)
+ 		}
+ 		return nil
+ 	}

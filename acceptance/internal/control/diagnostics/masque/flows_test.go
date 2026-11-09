@@ -14,32 +14,53 @@ import (
 	"vpn-script/internal/control/integration/traffic"
 )
 
-func measure(workers, packets, nonce int, window time.Duration) []flowResult {
+func measure(workers, packets, nonce int, window time.Duration, networks []string) []flowResult {
 	ctx, cancel := context.WithTimeout(context.Background(), window)
 	defer cancel()
-	ready, begin := make(chan struct{}, workers*2), make(chan struct{})
-	finished := make(chan flowResult, workers*2)
+	count := workers * len(networks)
+	ready, begin := make(chan struct{}, count), make(chan struct{})
+	finished := make(chan flowResult, count)
 	for worker := range workers {
-		go func() {
-			ready <- struct{}{}
-			<-begin
-			finished <- udpBurst(ctx, worker, packets, nonce)
-		}()
-		go func() {
-			ready <- struct{}{}
-			<-begin
-			finished <- tcpPayload(ctx, worker, nonce)
-		}()
+		for _, network := range networks {
+			go func() {
+				ready <- struct{}{}
+				<-begin
+				if network == "udp" {
+					finished <- udpBurst(ctx, worker, packets, nonce)
+				} else {
+					finished <- tcpPayload(ctx, worker, nonce)
+				}
+			}()
+		}
 	}
-	for range workers * 2 {
+	for range count {
 		<-ready
 	}
 	close(begin)
 	var results []flowResult
-	for range workers * 2 {
+	for range count {
 		results = append(results, <-finished)
 	}
 	return results
+}
+
+func trafficNetworks(selection string) ([]string, error) {
+	switch selection {
+	case "", "mixed":
+		return []string{"udp", "tcp"}, nil
+	case "udp", "tcp":
+		return []string{selection}, nil
+	default:
+		return nil, fmt.Errorf("unknown traffic selection: %q", selection)
+	}
+}
+
+func TestTrafficSelectionRejectsUnknownOrPartialNames(t *testing.T) {
+	for _, invalid := range []string{"TCP", "tcp,udp", "none", " tcp", "udp ", "tcp\x00"} {
+		if networks, err := trafficNetworks(invalid); err == nil || len(networks) != 0 {
+			t.Fatalf("invalid selection could silently change the measured workload: %q", invalid)
+		}
+	}
 }
 
 func packet(nonce, worker, sequence, size int) []byte {

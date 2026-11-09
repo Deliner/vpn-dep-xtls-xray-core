@@ -13,6 +13,26 @@ done
 cycles="$(cat cycles)" workers="$(cat workers)" packets="$(cat packets)"
 congestion="$(cat congestion)"
 case "$congestion" in ''|bbr|reno) ;; *) exit 2 ;; esac
+scenario=network-faults
+if [[ -e scenario || -L scenario ]]; then
+  [[ -f scenario && ! -L scenario ]] || exit 2
+  scenario="$(cat scenario)"
+fi
+case "$scenario" in network-faults|delay-history) ;; *) exit 2 ;; esac
+jitter=0
+queue=time
+traffic=mixed
+if [[ "$scenario" == delay-history ]]; then
+  [[ -f delay-jitter-ms && ! -L delay-jitter-ms ]] || exit 2
+  jitter="$(cat delay-jitter-ms)"
+  case "$jitter" in 0|5) ;; *) exit 2 ;; esac
+  [[ -f delay-queue && ! -L delay-queue ]] || exit 2
+  queue="$(cat delay-queue)"
+  case "$queue" in time|fifo) ;; *) exit 2 ;; esac
+  [[ -f delay-traffic && ! -L delay-traffic ]] || exit 2
+  traffic="$(cat delay-traffic)"
+  case "$traffic" in mixed|tcp|udp) ;; *) exit 2 ;; esac
+fi
 runtime_kind="$(cat runtime-kind)"
 case "$runtime_kind" in diagnostic-probe|runtime-candidate) ;; *) exit 2 ;; esac
 [[ "$cycles" =~ ^[1-9][0-9]?$ && "$workers" =~ ^[1-9][0-9]?$ && "$packets" =~ ^[1-9][0-9]{0,2}$ ]] || exit 2
@@ -28,6 +48,8 @@ done
 sudo -n env NHOP_MASQUE_HOST_net="$NHOP_MASQUE_HOST_net" NHOP_MASQUE_HOST_mnt="$NHOP_MASQUE_HOST_mnt" \
   NHOP_MASQUE_HOST_pid="$NHOP_MASQUE_HOST_pid" NHOP_MASQUE_CYCLES="$cycles" NHOP_MASQUE_WORKERS="$workers" \
   NHOP_MASQUE_PACKETS="$packets" NHOP_MASQUE_CONGESTION="$congestion" NHOP_MASQUE_RUNTIME_KIND="$runtime_kind" \
+  NHOP_MASQUE_SCENARIO="$scenario" NHOP_MASQUE_DELAY_JITTER_MS="$jitter" \
+  NHOP_MASQUE_DELAY_QUEUE="$queue" NHOP_MASQUE_DELAY_TRAFFIC="$traffic" \
   "${identity[@]}" unshare --mount --net --pid --fork --mount-proc --kill-child \
   bash namespace.sh || result=$?
 [[ "$(netem_host_network)" == "$before" ]] || result=1

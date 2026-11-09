@@ -9,6 +9,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/verify-inputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/verify-protocols.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/verify-boot.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/verify-registration.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/release.sh"
 for arch in amd64 arm64; do
   report="$collection/client-linux-$arch"
   [[ "$(cat "$report/status")" == passed ]] || exit 1
@@ -19,6 +20,7 @@ for arch in amd64 arm64; do
   client_verify_build "$report/network.test" "$report/test-build-observed.txt" "$arch"
   client_verify_build "$report/nhop-client" "$report/client-build-observed.txt" "$arch"
   for engine in xray sing-box; do
+    cmp "$report/release-policy/$engine.json" "$source_root/ops/release/runtime/$engine.json"
     [[ "$(sed -n 's/^target=//p' "$report/$engine-provenance.txt")" == "linux/$arch" ]] || exit 1
     cmp "$report/$engine-SHA256SUMS" "$report/$engine-observed.sha256"
   done

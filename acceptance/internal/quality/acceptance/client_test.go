@@ -10,6 +10,52 @@ import (
 	"testing"
 )
 
+func TestClientReleaseBindingRejectsUnpublishedRuntimeBytes(t *testing.T) {
+	for _, damage := range []string{"", "xray", "sing-box", "libcronet.so", "missing", "symlink", "wrong-arch", "malformed"} {
+		t.Run(damage, func(t *testing.T) {
+			root := t.TempDir()
+			clientReleaseFixture(t, root)
+			arch := "amd64"
+			switch damage {
+			case "xray", "sing-box", "libcronet.so":
+				write(t, filepath.Join(root, damage), "different self-consistent candidate", 0600)
+			case "missing":
+				if err := os.Remove(filepath.Join(root, "libcronet.so")); err != nil {
+					t.Fatal(err)
+				}
+			case "symlink":
+				if err := os.Rename(filepath.Join(root, "xray"), filepath.Join(root, "real")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink("real", filepath.Join(root, "xray")); err != nil {
+					t.Fatal(err)
+				}
+			case "wrong-arch":
+				arch = "arm64"
+			case "malformed":
+				write(t, filepath.Join(root, "xray.json"), `{"targets":{"amd64":{"binary_sha256":null}}}`, 0600)
+			}
+			command := exec.Command("bash", "-c", `source "$1"; if client_verify_release_runtime "$2" "$3" "$2/xray" "$2/sing-box" "$2/libcronet.so"; then exit 0; else exit 1; fi`,
+				"fixture", "../../../ops/testing/acceptance/client/release.sh", root, arch)
+			if output, err := command.CombinedOutput(); (err == nil) != (damage == "") {
+				t.Fatalf("release binding mismatch: %v %s", err, output)
+			}
+		})
+	}
+}
+
+func clientReleaseFixture(t *testing.T, root string) {
+	t.Helper()
+	for _, name := range []string{"xray", "sing-box", "libcronet.so"} {
+		write(t, filepath.Join(root, name), name, 0600)
+	}
+	xray := fmt.Sprintf(`{"targets":{"amd64":{"binary_sha256":"%x"}}}`, sha256.Sum256([]byte("xray")))
+	singbox := fmt.Sprintf(`{"targets":{"amd64":{"binary_sha256":"%x","library_sha256":"%x"}}}`,
+		sha256.Sum256([]byte("sing-box")), sha256.Sum256([]byte("libcronet.so")))
+	write(t, filepath.Join(root, "xray.json"), xray, 0600)
+	write(t, filepath.Join(root, "sing-box.json"), singbox, 0600)
+}
+
 func TestSystemdCollectorRejectsMissingRecoveryLeaksAndChangedUnits(t *testing.T) {
 	for _, damage := range []string{"", "released-gap", "missing-controller", "direct-leak", "counter-gap", "short-log", "empty-canary", "changed-unit", "cleanup-unit", "wrong-policy", "missing-disconnect", "early-disconnect", "disconnect-gap", "missing-remote", "duplicate-remote", "remote-counter", "remote-duration", "remote-attempts", "remote-failed"} {
 		t.Run(damage, func(t *testing.T) {

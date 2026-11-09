@@ -8,6 +8,7 @@ case "$arch/$(uname -m)" in amd64/x86_64|arm64/aarch64) ;; *) exit 2 ;; esac
 root="$PWD"
 source "$root/ops/runtime/integrity.sh"
 source "$root/ops/testing/acceptance/client/scenarios.sh"
+source "$root/ops/testing/acceptance/client/release.sh"
 report="$root/build/client-acceptance"
 mkdir -m 0700 "$report"
 trap 'result=$?; if ((result != 0)); then printf "failed\n" > "$report/status"; fi; (cd "$report"; find . -type f ! -name evidence.sha256 -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$report/evidence.sha256"' EXIT
@@ -18,7 +19,7 @@ printf 'running\n' > "$report/status"
   lscpu
   go version
   cc --version
-  dpkg-query --show nftables iproute2 dbus systemd-resolved ca-certificates
+  dpkg-query --show nftables iproute2 dbus systemd-resolved ca-certificates jq
   systemctl --version
   [[ "$(cat /proc/1/comm)" == systemd ]]
 } > "$report/identity.txt"
@@ -31,6 +32,12 @@ for engine in xray sing-box; do
   cp "$output/provenance.txt" "$report/$engine-provenance.txt"
   cp "$output/SHA256SUMS" "$report/$engine-SHA256SUMS"
 done
+mkdir "$report/release-policy"
+cp ops/release/runtime/{xray,sing-box}.json "$report/release-policy/"
+client_verify_release_runtime "$report/release-policy" "$arch" \
+  "build/runtime-candidates/client-xray-linux-$arch/bin/xray" \
+  "build/runtime-candidates/client-sing-box-linux-$arch/bin/sing-box" \
+  "build/runtime-candidates/client-sing-box-linux-$arch/bin/libcronet.so" > "$report/release-runtime-verification.log"
 CGO_ENABLED=1 GOOS=linux GOARCH="$arch" go test -race -c -trimpath -buildvcs=false \
   -o "$report/network.test" ./internal/control/client/acceptance
 go version -m "$report/network.test" > "$report/test-build.txt"

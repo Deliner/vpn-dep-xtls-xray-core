@@ -1,0 +1,144 @@
+--- /dev/null
++++ b/internal/ackhandler/mtu_probe_congestion_test.go
+@@ -0,0 +1,141 @@
++package ackhandler
++
++import (
++	"testing"
++	"time"
++
++	external "github.com/apernet/quic-go/congestion"
++	"github.com/apernet/quic-go/internal/congestion"
++	"github.com/apernet/quic-go/internal/monotime"
++	"github.com/apernet/quic-go/internal/protocol"
++	"github.com/apernet/quic-go/internal/utils"
++	"github.com/apernet/quic-go/internal/wire"
++	"github.com/stretchr/testify/require"
++)
++
++type mtuProbeBatch struct {
++	prior protocol.ByteCount
++	acked []external.AckedPacketInfo
++	lost  []external.LostPacketInfo
++}
++
++type mtuProbeObserver struct {
++	congestion.SendAlgorithmWithDebugInfos
++	batches  []mtuProbeBatch
++	ordinary []protocol.PacketNumber
++}
++
++func (o *mtuProbeObserver) OnCongestionEventEx(prior protocol.ByteCount, _ monotime.Time, acked []external.AckedPacketInfo, lost []external.LostPacketInfo) {
++	o.batches = append(o.batches, mtuProbeBatch{prior, append([]external.AckedPacketInfo(nil), acked...), append([]external.LostPacketInfo(nil), lost...)})
++}
++
++func (o *mtuProbeObserver) OnCongestionEvent(pn protocol.PacketNumber, lost, prior protocol.ByteCount) {
++	o.ordinary = append(o.ordinary, pn)
++	o.SendAlgorithmWithDebugInfos.OnCongestionEvent(pn, lost, prior)
++}
++
++func newMTUProbeObserver() (*sentPacketHandler, *mtuProbeObserver) {
++	h := NewSentPacketHandler(0, 1200, utils.NewRTTStats(), &utils.ConnectionStats{},
++		false, false, nil, protocol.PerspectiveClient, false, nil, utils.DefaultLogger).(*sentPacketHandler)
++	o := &mtuProbeObserver{SendAlgorithmWithDebugInfos: h.congestion}
++	h.congestion = o
++	return h, o
++}
++
++func sendMTUProbePacket(h *sentPacketHandler, packets *packetTracker, at monotime.Time, probe bool) protocol.PacketNumber {
++	pn := h.PopPacketNumber(protocol.EncryptionInitial)
++	h.SentPacket(at, pn, protocol.InvalidPacketNumber, nil, []Frame{packets.NewPingFrame(pn)},
++		protocol.EncryptionInitial, protocol.ECNNon, 1000, probe, false)
++	return pn
++}
++
++func assertMTUProbeBatchFlight(t *testing.T, batch mtuProbeBatch, actual protocol.ByteCount) {
++	t.Helper()
++	remaining := batch.prior
++	for _, packet := range batch.acked {
++		remaining -= protocol.ByteCount(packet.BytesAcked)
++	}
++	for _, packet := range batch.lost {
++		remaining -= protocol.ByteCount(packet.BytesLost)
++	}
++	require.Equal(t, actual, remaining, "extended controller retained discarded PMTU bytes in flight")
++}
++
++func TestMTUProbeLossExcludedFromExtendedACKBatch(t *testing.T) {
++	h, observer := newMTUProbeObserver()
++	var packets packetTracker
++	now := monotime.Now()
++	var pns []protocol.PacketNumber
++	for i := range 5 {
++		pns = append(pns, sendMTUProbePacket(h, &packets, now.Add(time.Duration(i)*100*time.Millisecond), i == 1))
++	}
++	_, err := h.ReceivedAck(&wire.AckFrame{AckRanges: ackRanges(pns[2], pns[3])}, protocol.EncryptionInitial, now.Add(1300*time.Millisecond))
++	require.NoError(t, err)
++	require.Equal(t, pns[:2], packets.Lost, "PMTU discovery still needs its loss callback")
++	require.Equal(t, pns[:1], observer.ordinary)
++	require.Len(t, observer.batches, 1)
++	batch := observer.batches[0]
++	require.Equal(t, []external.LostPacketInfo{{PacketNumber: external.PacketNumber(pns[0]), BytesLost: 1000}}, batch.lost,
++		"PMTU probe loss leaked into extended congestion control")
++	require.Len(t, batch.acked, 2)
++	require.Equal(t, protocol.ByteCount(4000), batch.prior)
++	assertMTUProbeBatchFlight(t, batch, h.bytesInFlight)
++	_, err = h.ReceivedAck(&wire.AckFrame{AckRanges: ackRanges(pns[0], pns[1])}, protocol.EncryptionInitial, now.Add(1400*time.Millisecond))
++	require.NoError(t, err)
++	require.Len(t, observer.batches, 1, "late ACK must not double-account discarded packets")
++}
++
++func TestMTUProbeLossExcludedFromExtendedTimerBatch(t *testing.T) {
++	for _, mixed := range []bool{false, true} {
++		t.Run(map[bool]string{false: "probe-only", true: "mixed"}[mixed], func(t *testing.T) {
++			testMTUProbeTimerBatch(t, mixed)
++		})
++	}
++}
++
++func testMTUProbeTimerBatch(t *testing.T, mixed bool) {
++	h, observer := newMTUProbeObserver()
++	var packets packetTracker
++	now := monotime.Now()
++	probe := sendMTUProbePacket(h, &packets, now, true)
++	var data protocol.PacketNumber
++	if mixed {
++		data = sendMTUProbePacket(h, &packets, now, false)
++	}
++	acked := sendMTUProbePacket(h, &packets, now.Add(time.Millisecond), false)
++	_, err := h.ReceivedAck(&wire.AckFrame{AckRanges: ackRanges(acked)}, protocol.EncryptionInitial, now.Add(100*time.Millisecond))
++	require.NoError(t, err)
++	require.Empty(t, packets.Lost)
++	require.Len(t, observer.batches, 1)
++	assertMTUProbeBatchFlight(t, observer.batches[0], h.bytesInFlight)
++	observer.batches = nil
++	deadline := h.GetLossDetectionTimeout()
++	require.NotZero(t, deadline)
++	require.NoError(t, h.OnLossDetectionTimeout(deadline))
++	require.Contains(t, packets.Lost, probe)
++	require.Zero(t, h.bytesInFlight)
++	if !mixed {
++		require.Empty(t, observer.ordinary)
++		require.Empty(t, observer.batches, "PMTU-only loss triggered extended congestion control")
++		return
++	}
++	require.Equal(t, []protocol.PacketNumber{data}, observer.ordinary)
++	require.Len(t, observer.batches, 1)
++	require.Equal(t, []external.LostPacketInfo{{PacketNumber: external.PacketNumber(data), BytesLost: 1000}}, observer.batches[0].lost,
++		"PMTU probe loss leaked into extended congestion control")
++	assertMTUProbeBatchFlight(t, observer.batches[0], h.bytesInFlight)
++}
++
++func TestMTUProbeACKStillContributesToExtendedDelivery(t *testing.T) {
++	h, observer := newMTUProbeObserver()
++	var packets packetTracker
++	now := monotime.Now()
++	probe := sendMTUProbePacket(h, &packets, now, true)
++	_, err := h.ReceivedAck(&wire.AckFrame{AckRanges: ackRanges(probe)}, protocol.EncryptionInitial, now.Add(100*time.Millisecond))
++	require.NoError(t, err)
++	require.Equal(t, []protocol.PacketNumber{probe}, packets.Acked)
++	require.Len(t, observer.batches, 1)
++	require.Empty(t, observer.batches[0].lost)
++	require.Equal(t, []external.AckedPacketInfo{{PacketNumber: external.PacketNumber(probe), BytesAcked: 1000}}, observer.batches[0].acked)
++	assertMTUProbeBatchFlight(t, observer.batches[0], 0)
++}

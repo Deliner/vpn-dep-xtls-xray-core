@@ -4,7 +4,18 @@ umask 077
 source "$(dirname "${BASH_SOURCE[0]}")/../../linux/environment.sh"
 lab_environment
 lab_owned
-[[ $# == 5 ]] || exit 2
+(( $# >= 5 && $# <= 9 )) || exit 2
+scenario="${6:-network-faults}"
+case "$scenario" in network-faults|delay-history) ;; *) exit 2 ;; esac
+jitter="${7:-0}"
+case "$jitter" in 0|5) ;; *) exit 2 ;; esac
+[[ "$scenario" == delay-history || "$jitter" == 0 ]] || exit 2
+queue="${8:-time}"
+case "$queue" in time|fifo) ;; *) exit 2 ;; esac
+[[ "$scenario" == delay-history || "$queue" == time ]] || exit 2
+traffic="${9:-mixed}"
+case "$traffic" in mixed|tcp|udp) ;; *) exit 2 ;; esac
+[[ "$scenario" == delay-history || "$traffic" == mixed ]] || exit 2
 case "$5" in ''|bbr|reno) ;; *) printf 'Diagnostic congestion must be empty, bbr or reno.\n' >&2; exit 2 ;; esac
 source "$lab_root/ops/testing/diagnostics/netem/runtime.sh"
 mkdir -p "$lab_data/runs"
@@ -21,6 +32,12 @@ printf '%s\n' "$2" > "$run/experiment/cycles"
 printf '%s\n' "$3" > "$run/experiment/workers"
 printf '%s\n' "$4" > "$run/experiment/packets"
 printf '%s\n' "$5" > "$run/experiment/congestion"
+if [[ "$scenario" != network-faults ]]; then
+  printf '%s\n' "$scenario" > "$run/experiment/scenario"
+  printf '%s\n' "$jitter" > "$run/experiment/delay-jitter-ms"
+  printf '%s\n' "$queue" > "$run/experiment/delay-queue"
+  printf '%s\n' "$traffic" > "$run/experiment/delay-traffic"
+fi
 {
   go version
   git rev-parse HEAD

@@ -63,6 +63,11 @@ lab-masque xray singbox probe repeats='20' debug='0':
 lab-masque-netem runtime cycles='3' workers='8' packets='32' congestion='':
     @bash ops/quality/check.sh static-analysis bash ops/testing/diagnostics/netem/lab.sh "$1" "$2" "$3" "$4" "$5"
 
+# Compare warm RTT steps with fresh delayed tunnels, preserving the two-second traffic deadline.
+[group('lab')]
+lab-masque-delay-history runtime cycles='2' workers='8' packets='32' congestion='' jitter='0' queue='time' traffic='mixed':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/diagnostics/netem/lab.sh "$1" "$2" "$3" "$4" "$5" delay-history "$6" "$7" "$8"
+
 # Verify controller SSH/SCP, literal paths and host-key refusal against the owned VM.
 [group('lab')]
 lab-ssh:

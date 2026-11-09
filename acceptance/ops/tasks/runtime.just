@@ -23,6 +23,21 @@ candidate-compare first second:
 masque-probe-build candidate output:
     @bash ops/quality/check.sh static-analysis bash ops/runtime/masque-probe.sh "$1" "$2"
 
+# Reproduce PMTU probe losses incorrectly reaching extended congestion control, then race-test a private patch.
+[group('runtime')]
+quic-mtu-congestion-test output:
+    @bash ops/quality/check.sh static-analysis bash ops/runtime/xray/quic/regression.sh "$1"
+
+# Run both verified QUIC variants and complete ACK/congestion packages natively in the owned Linux VM.
+[group('runtime')]
+quic-mtu-congestion-linux-test regression output:
+    @bash ops/quality/check.sh static-analysis bash ops/runtime/xray/quic/native.sh "$1" "$2"
+
+# Build a control or patched Xray with identical embedded QUIC sources; experimental, without release pin changes.
+[group('runtime')]
+quic-mtu-candidate base regression variant output:
+    @bash ops/quality/check.sh static-analysis bash ops/runtime/xray/quic/candidate.sh "$1" "$2" "$3" "$4"
+
 # Download an exact native toolchain input for checksum review without extracting or executing it.
 [group('runtime')]
 cronet-review-input component:

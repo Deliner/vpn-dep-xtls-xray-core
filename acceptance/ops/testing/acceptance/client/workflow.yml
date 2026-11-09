@@ -30,7 +30,7 @@ jobs:
       - name: Install Linux namespace and DNS test prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y nftables iproute2 dbus systemd-resolved ca-certificates
+          sudo apt-get install -y nftables iproute2 dbus systemd-resolved ca-certificates jq
       - name: Verify boot registration, all-protocol TUN and client recovery with race instrumentation
         working-directory: acceptance
         run: build/tools/bin/just acceptance-client-run '${{ matrix.arch }}'

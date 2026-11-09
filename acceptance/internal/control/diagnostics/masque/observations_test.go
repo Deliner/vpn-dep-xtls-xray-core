@@ -21,14 +21,11 @@ func observeLink(t *testing.T, namespace string, mtu int) linkObservation {
 		SNMP:       shell(t, namespace, "cat", "/proc/net/snmp"),
 		UDPSockets: shell(t, namespace, "cat", "/proc/net/udp"),
 	}
-	var queues []struct {
-		Kind  string `json:"kind"`
-		Drops uint64 `json:"drops"`
-	}
-	if err := json.Unmarshal(value.Queue, &queues); err != nil || len(queues) != 1 || queues[0].Kind != "netem" {
+	drops, err := queueObservation(value.Queue, historyOrdered(t))
+	if err != nil {
 		t.Fatalf("netem qdisc readback failed: %s / %v", value.Queue, err)
 	}
-	value.Drops = queues[0].Drops
+	value.Drops = drops
 	var links []struct {
 		MTU int `json:"mtu"`
 	}
@@ -36,6 +33,61 @@ func observeLink(t *testing.T, namespace string, mtu int) linkObservation {
 		t.Fatalf("MTU readback failed: %s / %v", value.Link, err)
 	}
 	return value
+}
+
+func queueObservation(raw []byte, ordered bool) (uint64, error) {
+	var queues []struct {
+		Kind    string `json:"kind"`
+		Handle  string `json:"handle"`
+		Parent  string `json:"parent"`
+		Root    bool   `json:"root"`
+		Drops   uint64 `json:"drops"`
+		Options struct {
+			Limit int `json:"limit"`
+		} `json:"options"`
+	}
+	want := 1
+	if ordered {
+		want++
+	}
+	if err := json.Unmarshal(raw, &queues); err != nil || len(queues) != want {
+		return 0, fmt.Errorf("expected %d queues: %v", want, err)
+	}
+	var drops uint64
+	seen := map[string]bool{}
+	for _, queue := range queues {
+		root := queue.Kind == "netem" && queue.Handle == "10:" && queue.Root && queue.Parent == ""
+		child := ordered && queue.Kind == "pfifo" && queue.Handle == "20:" && !queue.Root && queue.Parent == "10:1"
+		if (!root && !child) || seen[queue.Kind] || queue.Options.Limit != 4096 {
+			return 0, fmt.Errorf("unexpected queue identity: %+v", queue)
+		}
+		seen[queue.Kind] = true
+		drops += queue.Drops
+	}
+	return drops, nil
+}
+
+func TestQueueObservationRequiresSelectedTopology(t *testing.T) {
+	root := `{"kind":"netem","handle":"10:","root":true,"drops":3,"options":{"limit":4096}}`
+	child := `{"kind":"pfifo","handle":"20:","parent":"10:1","drops":5,"options":{"limit":4096}}`
+	for _, raw := range []string{"[" + root + "," + child + "]", "[" + child + "," + root + "]"} {
+		if drops, err := queueObservation([]byte(raw), true); err != nil || drops != 8 {
+			t.Fatalf("lost queue identity or drops: %d / %v", drops, err)
+		}
+		if _, err := queueObservation([]byte(raw), false); err == nil {
+			t.Fatal("accepted an unrequested child queue")
+		}
+	}
+	for _, raw := range []string{"[" + root + "]", "[" + child + "," + child + "]",
+		"[" + root + "," + strings.Replace(child, "10:1", "11:1", 1) + "]",
+		"[" + root + "," + strings.Replace(child, "4096", "128", 1) + "]"} {
+		if _, err := queueObservation([]byte(raw), true); err == nil {
+			t.Fatal("accepted missing, duplicate or incorrect FIFO topology")
+		}
+	}
+	if drops, err := queueObservation([]byte("["+root+"]"), false); err != nil || drops != 3 {
+		t.Fatalf("ordinary netem observation changed: %d / %v", drops, err)
+	}
 }
 
 func verifyBlackout(t *testing.T, report phaseReport) {

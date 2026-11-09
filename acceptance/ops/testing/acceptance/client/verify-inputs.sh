@@ -46,6 +46,8 @@ client_verify_inputs() {
 
 client_verify_runtime_inputs() {
   local mode="$1" name engine digest
+  client_verify_release_runtime "$source_root/ops/release/runtime" "$arch" \
+    "$mode/bin/xray" "$mode/bin/sing-box" "$mode/bin/libcronet.so" >> "$report/integrity-verification.log" || return 1
   for name in xray sing-box libcronet.so; do
     engine=sing-box
     if [[ "$name" == xray ]]; then engine=xray; fi

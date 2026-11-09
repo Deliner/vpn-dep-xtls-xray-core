@@ -70,5 +70,10 @@ for attempt in $(seq 1 100); do
 done
 grep -q 'listening on' reports/capture.log
 export NHOP_MASQUE_NETEM_TEST=private-netns NHOP_MASQUE_REPORT="$PWD/reports" XRAY_BINARY="$PWD/bin/xray"
-./network.test -test.run '^TestMASQUENetworkFaults$' -test.v -test.timeout=12m > reports/experiment.log 2>&1
+case "${NHOP_MASQUE_SCENARIO:-network-faults}" in
+  network-faults) pattern='^TestMASQUENetworkFaults$' ;;
+  delay-history) pattern='^TestMASQUEDelayHistory$' ;;
+  *) exit 2 ;;
+esac
+./network.test -test.run "$pattern" -test.v -test.timeout=12m > reports/experiment.log 2>&1
 cat reports/experiment.log

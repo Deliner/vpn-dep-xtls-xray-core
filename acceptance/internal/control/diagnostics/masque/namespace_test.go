@@ -44,7 +44,22 @@ func shape(t *testing.T, state impairment) {
 		shell(t, namespace, "ip", "link", "set", "nhop-link", "mtu", strconv.Itoa(state.MTU))
 		arguments := []string{"tc", "qdisc", "replace", "dev", "nhop-link", "root", "handle", "10:", "netem", "limit", "4096"}
 		shell(t, namespace, append(arguments, state.Netem...)...)
+		if historyOrdered(t) {
+			shell(t, namespace, "tc", "qdisc", "replace", "dev", "nhop-link", "parent", "10:1", "handle", "20:", "pfifo", "limit", "4096")
+		}
 	}
+}
+
+func historyOrdered(t *testing.T) bool {
+	t.Helper()
+	if os.Getenv("NHOP_MASQUE_SCENARIO") != "delay-history" {
+		return false
+	}
+	queue := os.Getenv("NHOP_MASQUE_DELAY_QUEUE")
+	if queue != "time" && queue != "fifo" {
+		t.Fatal("delay-history queue must be explicitly time or fifo")
+	}
+	return queue == "fifo"
 }
 
 func boundedEnvironment(t *testing.T, name string, fallback, maximum int) int {

@@ -30,10 +30,11 @@ type fixture struct {
 }
 
 type impairment struct {
-	Name   string   `json:"name"`
-	MTU    int      `json:"mtu"`
-	Netem  []string `json:"netem"`
-	Policy string   `json:"policy"`
+	Name    string   `json:"name"`
+	MTU     int      `json:"mtu"`
+	Netem   []string `json:"netem"`
+	Policy  string   `json:"policy"`
+	Traffic string   `json:"traffic,omitempty"`
 }
 
 type flowResult struct {
