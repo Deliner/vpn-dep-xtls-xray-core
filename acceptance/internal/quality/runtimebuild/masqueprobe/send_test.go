@@ -53,14 +53,57 @@ func TestSendProbeRejectsChangedSourceAndOccupiedControl(t *testing.T) {
 	if err := os.WriteFile(path, []byte(sendFixture), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := instrumentVerifiedSend(path); err == nil {
+	if _, _, err := instrumentVerifiedSend(path); err == nil {
 		t.Fatal("accepted an unreviewed send queue")
 	}
-	if _, err := prepareSendControl(path); err == nil {
+	if _, err := prepareSendControl(path, sendQueueSource); err == nil {
 		t.Fatal("overwrote an existing diagnostic control path")
 	}
 	actual, err := os.ReadFile(path)
 	if err != nil || string(actual) != sendFixture {
 		t.Fatal("rejected diagnostic changed input source")
+	}
+}
+
+const mtuSendFixture = `package quic
+import (
+	"errors"
+	"fmt"
+)
+func (h *sendQueue) write(entry queueEntry) error {
+	defer entry.buf.Release()
+	err := h.conn.Write(entry.buf.Data, entry.gsoSize, entry.ecn)
+	var tooLarge *DatagramTooLargeError
+	if err == nil || !isSendMsgSizeErr(err) && !errors.As(err, &tooLarge) {
+		return err
+	}
+	if entry.mtuProbe {
+		return nil
+	}
+	return fmt.Errorf("non-probe packet: %w", err)
+}
+`
+
+func TestMTUProbeInstrumentationPreservesFatalDataErrors(t *testing.T) {
+	modified, err := instrumentMTUSendQueue([]byte(mtuSendFixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invariant := range []string{"defer entry.buf.Release()", "h.conn.Write(entry.buf.Data, entry.gsoSize, entry.ecn)",
+		"if entry.mtuProbe {", "return fmt.Errorf(\"non-probe packet: %w\", err)", "NHOP_QUIC_SEND_SIZE_DROP"} {
+		if bytes.Count(modified, []byte(invariant)) != 1 {
+			t.Fatalf("diagnostic changed data/probe policy: %s", invariant)
+		}
+	}
+	for _, input := range [][]byte{modified, []byte(strings.ReplaceAll(mtuSendFixture, "entry.mtuProbe", "true"))} {
+		if _, err := instrumentMTUSendQueue(input); err == nil {
+			t.Fatal("accepted ambiguous MTU error policy")
+		}
+	}
+	for _, sha := range []string{sendQueueSource, sendQueueMTUSource, "unknown"} {
+		control, err := prepareSendControl(filepath.Join(t.TempDir(), "control.go"), sha)
+		if (err == nil) != (sha != "unknown") || sha == sendQueueMTUSource && !bytes.Contains(control, []byte("SendMTUProbe")) {
+			t.Fatalf("control does not match its reviewed source: %s %v", sha, err)
+		}
 	}
 }

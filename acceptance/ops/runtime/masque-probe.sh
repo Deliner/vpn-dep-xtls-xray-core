@@ -46,12 +46,23 @@ if ! go -C "$base/source" test -modfile "$output/probe.mod" -overlay "$output/ov
   cat "$output/send-control.log" >&2
   exit 1
 fi
-for kernel in true false; do
-  grep -Eq "NHOP_QUIC_SEND_SIZE_DROP .*bytes=1300 gso=1300 kernel=$kernel " "$output/send-control.log" || {
-    printf 'Diagnostic control did not observe send-size failure (kernel=%s).\n' "$kernel" >&2
-    exit 1
-  }
-done
+if grep -q '^NHOP_SEND_POLICY ' "$output/send-control.log"; then
+  for kernel in true false; do
+    for probe in true false; do
+      terminal=true
+      [[ "$probe" != true ]] || terminal=false
+      grep -Eq "NHOP_QUIC_SEND_SIZE_DROP .*bytes=1300 gso=0 kernel=$kernel probe=$probe terminal=$terminal " "$output/send-control.log"
+      grep -q "^NHOP_SEND_POLICY probe=$probe terminal=$terminal preserved=true$" "$output/send-control.log"
+    done
+  done
+else
+  for kernel in true false; do
+    grep -Eq "NHOP_QUIC_SEND_SIZE_DROP .*bytes=1300 gso=1300 kernel=$kernel " "$output/send-control.log" || {
+      printf 'Diagnostic control did not observe send-size failure (kernel=%s).\n' "$kernel" >&2
+      exit 1
+    }
+  done
+fi
 if ! grep -Eq 'NHOP_H3_QUEUE_DROP .*queued=32 bytes=1 prefix=20$' "$output/control.log"; then
   printf 'Diagnostic control did not observe the expected queue drop.\n' >&2
   cat "$output/control.log" >&2

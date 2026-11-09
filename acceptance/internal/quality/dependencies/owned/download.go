@@ -24,7 +24,7 @@ func Download(ctx context.Context, run commands.Runner, module, revision string)
 		return Record{}, err
 	}
 	result := Record{RequestDirectory: directory, Files: map[string]string{}}
-	args := []string{"GOPROXY=https://proxy.golang.org", "GOSUMDB=sum.golang.org", "GOPRIVATE=", "GONOPROXY=", "GONOSUMDB=", "GOTOOLCHAIN=local",
+	args := []string{"GOPROXY=https://proxy.golang.org,direct", "GOSUMDB=sum.golang.org", "GOPRIVATE=", "GONOPROXY=", "GONOSUMDB=", "GOTOOLCHAIN=local",
 		"go", "-C", directory, "mod", "download", "-json", "github.com/" + module + "@" + revision}
 	raw, commandErr := run(ctx, "env", args...)
 	if err := safeio.Atomic(filepath.Join(directory, "download.json"), raw, 0600); err != nil {

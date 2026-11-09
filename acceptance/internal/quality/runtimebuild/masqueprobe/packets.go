@@ -13,6 +13,7 @@ import (
 )
 
 const packetSource = "c1a73a713e5d9ac0194956a02c9d0c4f87bfa83afbcef2b569d5639c6def6288"
+const packetCapsuleSource = "25128bc508a6e4e710265a54e4a93da59ae2a4ecbfe9d33badd46bd7cae0969a"
 
 func inspectPackets(source string) ([]sourceChange, error) {
 	root, err := filepath.Abs(source)
@@ -25,18 +26,19 @@ func inspectPackets(source string) ([]sourceChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	if fmt.Sprintf("%x", sha256.Sum256(original)) != packetSource {
+	sha := fmt.Sprintf("%x", sha256.Sum256(original))
+	if sha != packetSource && sha != packetCapsuleSource {
 		return nil, fmt.Errorf("unreviewed CONNECT-IP packet source; diagnostic overlay refused")
 	}
 	modified, err := instrumentPackets(original)
 	if err != nil {
 		return nil, err
 	}
-	helpers, err := preparePacketHelpers(root, "connectip", packetBindingControl)
+	helpers, err := preparePacketHelpers(root, "connectip", packetControl(sha == packetCapsuleSource))
 	if err != nil {
 		return nil, err
 	}
-	return append([]sourceChange{{Target: path, SourceSHA: packetSource, Modified: modified}}, helpers...), nil
+	return append([]sourceChange{{Target: path, SourceSHA: sha, Modified: modified}}, helpers...), nil
 }
 
 func preparePacketHelpers(root, targetPackage, control string) ([]sourceChange, error) {

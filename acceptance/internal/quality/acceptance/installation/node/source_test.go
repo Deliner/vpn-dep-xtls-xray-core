@@ -40,8 +40,10 @@ func previousFixture(t *testing.T) (string, string) {
 	t.Helper()
 	previous, snapshot := t.TempDir(), t.TempDir()
 	raw := []byte("package example\n")
+	commit := strings.Repeat("a", 40)
 	var buffer bytes.Buffer
 	archive := tar.NewWriter(&buffer)
+	require(t, archive.WriteHeader(&tar.Header{Name: "pax_global_header", Typeflag: tar.TypeXGlobalHeader, PAXRecords: map[string]string{"comment": commit}}))
 	require(t, archive.WriteHeader(&tar.Header{Name: "main.go", Mode: 0600, Size: int64(len(raw))}))
 	_, err := archive.Write(raw)
 	require(t, err)
@@ -50,12 +52,59 @@ func previousFixture(t *testing.T) (string, string) {
 	write(t, filepath.Join(previous, "source/main.go"), raw)
 	write(t, filepath.Join(previous, "source.sha256"), []byte(safeio.Hash(raw)+"  ./main.go\n"))
 	write(t, filepath.Join(previous, "bin/nhop-node"), []byte("program"))
-	commit, sha := strings.Repeat("a", 40), safeio.Hash(buffer.Bytes())
+	sha := safeio.Hash(buffer.Bytes())
 	write(t, filepath.Join(previous, "provenance.txt"), []byte(fmt.Sprintf("project_commit=%s\narchive_sha256=%s\ntarget=linux/amd64\n", commit, sha)))
 	policy := filepath.Join(snapshot, "ops/testing/acceptance/installer")
 	write(t, filepath.Join(policy, "previous.tsv"), []byte(fmt.Sprintf("%s\t%s\t%d\n", commit, sha, buffer.Len())))
 	write(t, filepath.Join(policy, "programs.tsv"), []byte(fmt.Sprintf("amd64\t%s\narm64\t%s\n", safeio.Hash([]byte("program")), safeio.Hash([]byte("program")))))
 	return previous, snapshot
+}
+
+func TestGitSourceMetadataCannotOverrideArchiveMembers(t *testing.T) {
+	commit := strings.Repeat("a", 40)
+	for _, damage := range []string{"", "commit", "path", "duplicate", "late", "missing", "runtime"} {
+		t.Run(damage, func(t *testing.T) {
+			raw := gitArchiveFixture(t, commit, damage)
+			wanted := commit
+			if damage == "runtime" {
+				wanted = ""
+			}
+			files, err := tarHashes(bytes.NewReader(raw), "", wanted)
+			if (err == nil) != (damage == "") {
+				t.Fatalf("metadata policy mismatch: %s: %v", damage, err)
+			}
+			if err == nil && (len(files) != 1 || files["main.go"] != safeio.Hash([]byte("source"))) {
+				t.Fatalf("source inventory changed: %v", files)
+			}
+		})
+	}
+}
+
+func gitArchiveFixture(t *testing.T, commit, damage string) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	archive := tar.NewWriter(&buffer)
+	header := &tar.Header{Name: "pax_global_header", Typeflag: tar.TypeXGlobalHeader, PAXRecords: map[string]string{"comment": commit}}
+	if damage == "commit" {
+		header.PAXRecords["comment"] = strings.Repeat("b", 40)
+	}
+	if damage == "path" {
+		header.PAXRecords["path"] = "../outside"
+	}
+	if damage != "missing" && damage != "late" {
+		require(t, archive.WriteHeader(header))
+	}
+	if damage == "duplicate" {
+		require(t, archive.WriteHeader(header))
+	}
+	require(t, archive.WriteHeader(&tar.Header{Name: "main.go", Mode: 0600, Size: 6}))
+	_, err := archive.Write([]byte("source"))
+	require(t, err)
+	if damage == "late" {
+		require(t, archive.WriteHeader(header))
+	}
+	require(t, archive.Close())
+	return buffer.Bytes()
 }
 
 func TestSourcePreparationRefusesUnpinnedInputsAndExistingOutputs(t *testing.T) {

@@ -1,7 +1,9 @@
 package owned
 
 import (
+	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -18,5 +20,24 @@ func TestDownloadFailureKeepsServerDiagnostic(t *testing.T) {
 	}
 	if _, err = downloadResult([]byte(`not JSON`), nil); err == nil {
 		t.Fatal("invalid response accepted")
+	}
+}
+
+func TestDirectFallbackKeepsAuthenticatedChecksumPolicy(t *testing.T) {
+	t.Chdir(t.TempDir())
+	var executable string
+	var arguments []string
+	run := func(_ context.Context, name string, args ...string) ([]byte, error) {
+		executable, arguments = name, args
+		return []byte(`{"Error":"deliberate offline test"}`), errors.New("download failed")
+	}
+	_, err := Download(context.Background(), run, "Deliner/vpn-dep-apernet-quic-go", strings.Repeat("a", 40))
+	if err == nil || !strings.Contains(err.Error(), "deliberate offline test") || executable != "env" {
+		t.Fatalf("failed download was not preserved: %v", err)
+	}
+	for _, setting := range []string{"GOPROXY=https://proxy.golang.org,direct", "GOSUMDB=sum.golang.org", "GOPRIVATE=", "GONOPROXY=", "GONOSUMDB="} {
+		if !slices.Contains(arguments, setting) {
+			t.Fatalf("authenticated fallback setting missing: %s", setting)
+		}
 	}
 }

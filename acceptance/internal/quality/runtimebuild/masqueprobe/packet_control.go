@@ -2,6 +2,16 @@ package masqueprobe
 
 import "strings"
 
+func packetControl(capsules bool) string {
+	if !capsules {
+		return packetBindingControl
+	}
+	return strings.NewReplacer(
+		"closeChan: make(chan struct{}), localRoutes:", "h3Receiver: newDatagramReceiver(stream), closeChan: make(chan struct{}), localRoutes:",
+		"packet := nhopTestPacket(4)", "defer conn.h3Receiver.stop()\n\tpacket := nhopTestPacket(4)",
+	).Replace(packetBindingControl) + packetCapsuleControl
+}
+
 func deviceControl(fair bool) string {
 	if !fair {
 		return deviceBindingControl
@@ -17,7 +27,8 @@ func deviceControl(fair bool) string {
 }
 
 // These controls run against the actual overlaid CONNECT-IP Conn. They exercise
-// success and failure boundaries without starting any network or background work.
+// success and failure boundaries without network access. The capsule-capable
+// implementation owns a lazy datagram reader, which the control stops explicitly.
 const packetBindingControl = `package connectip
 
 import (
@@ -69,6 +80,24 @@ func TestNHOPPacketBindingPreservesSendFailure(t *testing.T) {
 	}
 	if _, err := conn.ReadPacket(make([]byte, 1500)); !errors.Is(err, failure) {
 		t.Fatalf("closed read behavior changed: %v", err)
+	}
+}
+`
+
+const packetCapsuleControl = `
+func TestNHOPPacketBindingPreservesCapsuleDelivery(t *testing.T) {
+	stream := &mockStream{}
+	reader := newDatagramReceiver(stream)
+	defer reader.stop()
+	datagrams := make(chan []byte, 1)
+	conn := &Conn{h3: stream, h3Receiver: reader, datagrams: datagrams, closeChan: make(chan struct{}),
+		localRoutes: []IPRoute{{StartIP: netip.IPv4Unspecified(), EndIP: netip.MustParseAddr("255.255.255.255")}}}
+	packet := nhopTestPacket(4)
+	datagrams <- append([]byte{0}, packet...)
+	buffer := make([]byte, len(packet))
+	n, err := conn.ReadPacket(buffer)
+	if err != nil || n != len(packet) || !bytes.Equal(buffer, packet) {
+		t.Fatalf("capsule delivery changed: n=%d err=%v", n, err)
 	}
 }
 `

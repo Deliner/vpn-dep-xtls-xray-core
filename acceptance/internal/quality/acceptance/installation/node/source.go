@@ -67,7 +67,7 @@ func previousSources(directory, snapshot, arch string) error {
 	if len(fields) != 3 {
 		return fmt.Errorf("invalid previous source policy")
 	}
-	files, err := previousArchive(filepath.Join(directory, "source.tar"), fields[1], fields[2])
+	files, err := previousArchive(filepath.Join(directory, "source.tar"), fields[0], fields[1], fields[2])
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func previousSources(directory, snapshot, arch string) error {
 	return previousProgram(directory, snapshot, arch)
 }
 
-func previousArchive(path, expectedSHA, expectedSize string) (map[string]string, error) {
+func previousArchive(path, commit, expectedSHA, expectedSize string) (map[string]string, error) {
 	info, err := os.Stat(path)
 	if err != nil || fmt.Sprint(info.Size()) != expectedSize {
 		return nil, fmt.Errorf("previous source archive size changed")
@@ -102,7 +102,7 @@ func previousArchive(path, expectedSHA, expectedSize string) (map[string]string,
 		return nil, err
 	}
 	defer file.Close()
-	return tarHashes(file, "")
+	return tarHashes(file, "", commit)
 }
 
 func policyFields(raw []byte) []string {

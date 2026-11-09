@@ -120,3 +120,15 @@ dependency-format directory +files:
 [group('dependencies')]
 dependency-push repository:
     @bash ops/quality/check.sh static-analysis bash ops/dependencies/push.sh "$1"
+
+# Regenerate only the QUIC send queue mock from its pinned Go tool and maintained interface.
+[group('dependencies')]
+dependency-quic-mocks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    directory="$PWD/build/dependencies/checkouts/vpn-dep-apernet-quic-go"
+    case "$(git -C "$directory" remote get-url origin)" in
+      https://github.com/Deliner/vpn-dep-apernet-quic-go|https://github.com/Deliner/vpn-dep-apernet-quic-go.git) ;;
+      *) exit 2 ;;
+    esac
+    GOWORK=off GOFLAGS=-mod=readonly bash ops/quality/check.sh static-analysis go -C "$directory" generate -run mock_sender_test.go mockgen.go

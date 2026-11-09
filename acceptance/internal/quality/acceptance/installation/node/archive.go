@@ -24,16 +24,27 @@ func digestReader(reader io.Reader, size int64) (string, error) {
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
-func tarHashes(reader io.Reader, prefix string) (map[string]string, error) {
+func tarHashes(reader io.Reader, prefix, gitCommit string) (map[string]string, error) {
 	archive := tar.NewReader(reader)
 	files := map[string]string{}
+	metadata := gitCommit == ""
 	for {
 		member, err := archive.Next()
 		if err == io.EOF {
+			if !metadata {
+				return nil, fmt.Errorf("Git source archive lacks commit metadata")
+			}
 			return files, nil
 		}
 		if err != nil {
 			return nil, err
+		}
+		if member.Typeflag == tar.TypeXGlobalHeader {
+			if metadata || len(files) != 0 || !gitHeader(member, gitCommit) {
+				return nil, fmt.Errorf("unexpected Git archive metadata")
+			}
+			metadata = true
+			continue
 		}
 		if member.Typeflag == tar.TypeDir {
 			continue
@@ -50,6 +61,11 @@ func tarHashes(reader io.Reader, prefix string) (map[string]string, error) {
 	}
 }
 
+func gitHeader(header *tar.Header, commit string) bool {
+	return commit != "" && header.Name == "pax_global_header" && len(header.PAXRecords) == 1 &&
+		header.PAXRecords["comment"] == commit
+}
+
 func gzipHashes(path, prefix string) (map[string]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -61,7 +77,7 @@ func gzipHashes(path, prefix string) (map[string]string, error) {
 		return nil, err
 	}
 	defer reader.Close()
-	files, err := tarHashes(reader, prefix)
+	files, err := tarHashes(reader, prefix, "")
 	if err != nil {
 		return nil, err
 	}

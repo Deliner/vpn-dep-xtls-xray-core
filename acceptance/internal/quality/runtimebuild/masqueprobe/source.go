@@ -27,18 +27,18 @@ func inspectSources(root string) ([]sourceChange, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	send, err := instrumentVerifiedSend(sendPath)
+	send, sendSHA, err := instrumentVerifiedSend(sendPath)
 	if err != nil {
 		return nil, "", err
 	}
 	controlPath := filepath.Join(root, "nhop_send_control_test.go")
-	control, err := prepareSendControl(controlPath)
+	control, err := prepareSendControl(controlPath, sendSHA)
 	if err != nil {
 		return nil, "", err
 	}
 	return []sourceChange{
 		{Target: receivePath, SourceSHA: receiveSHA, Modified: receive},
-		{Target: sendPath, SourceSHA: sendQueueSource, Modified: send},
+		{Target: sendPath, SourceSHA: sendSHA, Modified: send},
 		{Target: controlPath, Modified: control},
 	}, policy, nil
 }

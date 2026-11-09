@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 candidate_configure() {
   candidate_patch
-  build_label=nhop-fork-masque-fair-1
+  build_label=nhop-fork-masque-capsule-1
   build_package=./main
   build_tags=
   build_cgo=0

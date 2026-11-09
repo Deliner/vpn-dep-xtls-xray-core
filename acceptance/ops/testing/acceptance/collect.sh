@@ -57,6 +57,15 @@ fi
 for arch in amd64 arm64; do
   report="$collection/acceptance-linux-$arch"
   [[ "$(cat "$report/status")" == passed ]] || exit 1
+  if grep -Fq 'xray-masque-regressions.log' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
+    [[ -s "$report/xray-regressions-integrity.log" ]] || exit 1
+    for regression in TestNHOPHTTP3CapsulesAndDatagrams TestNHOPHTTP3CapsuleValidation \
+      TestNHOPHTTP3TruncatedCapsuleClosesRequest TestNHOPHTTP3CapsuleShortBuffer \
+      TestNHOPDatagramReceiverBackpressure TestNHOPDatagramReceiverStopsWhileBlocked \
+      TestNHOPDatagramReceiverConcurrentStop TestNHOPDatagramReceiverStopBeforeFirstRead; do
+      grep -Fq -- "--- PASS: $regression (" "$report/xray-masque-regressions.log" || exit 1
+    done
+  fi
   (cd "$report"; shasum -a 256 --check evidence.sha256) > "$report/integrity-verification.log"
   started="$(cat "$report/started-unix")"
   just payload-report "$report/payload" '1,3' "$started" "linux/$arch" '127.0.0.1'

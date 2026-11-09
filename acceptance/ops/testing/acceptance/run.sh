@@ -28,6 +28,9 @@ for engine in xray sing-box; do
   cp "$output/provenance.txt" "$report/$engine-provenance.txt"
   cp "$output/SHA256SUMS" "$report/$engine-SHA256SUMS"
 done
+xray_source="$root/build/runtime-candidates/xray-linux-$arch/source"
+just dependency-test "$xray_source" ./transport/internet/masque/... > "$report/xray-masque-regressions.log" 2>&1
+(cd "$xray_source/.."; sha256sum --check SHA256SUMS) > "$report/xray-regressions-integrity.log"
 xray="$root/build/runtime-candidates/xray-linux-$arch/bin/xray"
 singbox="$root/build/runtime-candidates/sing-box-linux-$arch/bin/sing-box"
 NHOP_IPV6_ACCEPTANCE=1 just payload "$xray" "$singbox" Test "$report/payload" > "$report/payload.log" 2>&1
