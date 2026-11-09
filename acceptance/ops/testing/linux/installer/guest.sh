@@ -36,6 +36,7 @@ if sudo -n env NHOP_SYSTEMD_ACCEPTANCE="$mode" NHOP_NODE_BINARY="$bundle/bin/nho
   RUNNER_ENVIRONMENT="${RUNNER_ENVIRONMENT:-}" GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME:-}" GITHUB_REF="${GITHUB_REF:-}" \
   GITHUB_SHA="${GITHUB_SHA:-}" GITHUB_RUN_ID="${GITHUB_RUN_ID:-}" NHOP_NODE_CI="${NHOP_NODE_CI:-}" \
   NHOP_PREVIOUS_NODE_BINARY="$previous" \
+  NHOP_PAYLOAD_DEBUG=1 NHOP_RUNTIME_LOG_DIR="$bundle/reports/runtime-logs" \
   NHOP_SYSTEMD_REPORT="$bundle/reports/installed.json" "$bundle/integration.test" \
   -test.run '^TestInstalledNodeLifecycle$' -test.v -test.timeout=20m > "$bundle/reports/payload.log" 2>&1; then
   printf 'passed\n' > "$bundle/reports/status"

@@ -66,8 +66,10 @@ func installedCleanup(t *testing.T, report *installedSuite) {
 		t.Errorf("cannot stop test service; preserving state: %v: %s", stopErr, result.Output)
 		return
 	}
-	if !t.Failed() {
-		require(t, installation.CaptureInputs(filepath.Dir(os.Getenv("NHOP_SYSTEMD_REPORT")), report.CachedArchives, report.PreviousRuntimes))
+	if len(report.CachedArchives) > 0 {
+		if err := installation.CaptureInputs(filepath.Dir(os.Getenv("NHOP_SYSTEMD_REPORT")), report.CachedArchives, report.PreviousRuntimes); err != nil {
+			t.Error(err)
+		}
 	}
 	for _, path := range []string{installedUnit, installedBase, installedDropin} {
 		if err := os.RemoveAll(path); err != nil {
@@ -151,10 +153,14 @@ func installedChangedLogs(t *testing.T, l *lab) model.NodeConfig {
 	t.Helper()
 	changed := installedConfig(t, l)
 	for _, program := range changed.Programs {
-		program.Config["log"] = model.Object{"level": "debug"}
+		key, level := "level", "debug"
 		if program.Name == "xray" {
-			program.Config["log"] = model.Object{"loglevel": "debug"}
+			key = "loglevel"
 		}
+		if current, ok := program.Config["log"].(model.Object); ok && current[key] == level {
+			level = "info"
+		}
+		program.Config["log"] = model.Object{key: level}
 	}
 	return installedDigest(t, changed)
 }
