@@ -1,9 +1,12 @@
 package singrelease
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"sort"
+	"strings"
 	"vpn-script/internal/quality/runtimerelease"
 )
 
@@ -42,8 +45,38 @@ func completeEvidence(root string, entries map[string]string) error {
 			return fmt.Errorf("special native evidence input: %s", name)
 		}
 		if entries[name] == "" && name != "evidence.sha256" && name != "integrity-verification.log" {
+			if name == "tuic/evidence.sha256" {
+				return derivedTUICInventory(root, entries)
+			}
 			return fmt.Errorf("unrecorded native evidence input: %s", name)
 		}
 		return nil
 	})
+}
+
+// Earlier producers excluded every evidence.sha256 basename. Authenticate this
+// derived inventory from the already reviewed parent entries, never from itself.
+func derivedTUICInventory(root string, entries map[string]string) error {
+	var names []string
+	for name := range entries {
+		if strings.HasPrefix(name, "tuic/") {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return fmt.Errorf("TUIC inventory has no authenticated parent entries")
+	}
+	sort.Strings(names)
+	var expected bytes.Buffer
+	for _, name := range names {
+		fmt.Fprintf(&expected, "%s  ./%s\n", entries[name], strings.TrimPrefix(name, "tuic/"))
+	}
+	raw, err := runtimerelease.ReadRegular(root, "tuic/evidence.sha256", 4_000_000)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(raw, expected.Bytes()) {
+		return fmt.Errorf("TUIC inventory differs from authenticated parent entries")
+	}
+	return nil
 }

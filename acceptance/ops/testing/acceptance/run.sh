@@ -54,4 +54,4 @@ for scenario in ipv6-single ipv6-chain mixed-6-4-6 mixed-4-6-4; do
   just payload-report "$report/payload/$scenario" "$hops" "$started" "linux/$arch" "$addresses" >> "$report/verification.log" 2>&1
 done
 printf 'passed\n' > "$report/status"
-(cd "$report"; find . -type f ! -name evidence.sha256 -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$report/evidence.sha256"
+(cd "$report"; find . -type f ! -path ./evidence.sha256 -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$report/evidence.sha256"

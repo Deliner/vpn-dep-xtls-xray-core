@@ -32,10 +32,10 @@ func BenchmarkCompileFleet(b *testing.B) {
 
 func TestNodeGenerationCompatibility(t *testing.T) {
 	// Runtime archive identity is part of the canonical generation, including on
-	// relays. Snapshots include maintained Xray masque-sack-1 and sing-box Cronet/zlib assets.
+	// relays. Snapshots include maintained Xray masque-sack-1 and sing-box Cronet/zlib/TUIC assets.
 	want := map[bool][]string{
 		false: {"c7b3a8a389b19078192f5dd58cd34338e8bb847d5b5486f817b98720ed9907ee", "c2f814ca4af1ab740b68372e0b1ff074b2a89e435f7d50874e8bccec83e62737", "a9e72191bef78f5c2932d64c7895c13e7e61f3ce2b3852f011258c887065cb69"},
-		true:  {"0fcef65e675c039858dbb29d91ee6f9d2465b933781a3404dca5ef4f183f3674", "c37936b13d8c4d751e395d8858b0084cfe1df784f07c8405beded5764aac41b2", "16bb49fafa2394fbbc1265ced7513f10bc5b8d4ab4656326014e49a86366b610"},
+		true:  {"e03385de2dd8cdd7c94bfa40a1983ad4f3f32643ca06903d33a3af9821287b6e", "a0fd00117e783a1315617a9d4b22d99d2de89b0afc678945144d0ebca0a7c132", "05966c1abc798d25887015b817659fe427da5771a056759edff93f962b1902b2"},
 	}
 	for _, mixed := range []bool{false, true} {
 		top, state := fleetFixture(3, mixed)

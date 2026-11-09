@@ -97,8 +97,9 @@ func (audit runtimeAudit) scan(path, engine, arch string) error {
 	command.Stdout, command.Stderr = output, output
 	defer process.Stop(command)
 	scanErr := command.Run()
-	_, writeErr := fmt.Fprintf(output, "\nscan_error=%v\n", scanErr)
+	upstreamErr := auditLocalReplacements(ctx, audit.scanner, path, output)
+	_, writeErr := fmt.Fprintf(output, "\nscan_error=%v\nupstream_audit_error=%v\n", scanErr, upstreamErr)
 	closeErr := output.Close()
 	renameErr := os.Rename(output.Name(), audit.report(engine, arch))
-	return errors.Join(scanErr, writeErr, closeErr, renameErr)
+	return errors.Join(scanErr, upstreamErr, writeErr, closeErr, renameErr)
 }

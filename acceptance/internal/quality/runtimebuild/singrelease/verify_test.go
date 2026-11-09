@@ -1,12 +1,50 @@
 package singrelease
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"vpn-script/internal/platform/safeio"
 )
+
+func TestDerivedTUICInventoryRequiresExactAuthenticatedEntries(t *testing.T) {
+	for _, damage := range []string{"", "changed", "missing", "duplicate", "extra", "unbound", "symlink"} {
+		t.Run(damage, func(t *testing.T) {
+			root := t.TempDir()
+			entries := map[string]string{"tuic/a": safeio.Hash([]byte("a")), "tuic/b": safeio.Hash([]byte("b"))}
+			put(t, root, "tuic/a", []byte("a"))
+			put(t, root, "tuic/b", []byte("b"))
+			raw := fmt.Sprintf("%s  ./a\n%s  ./b\n", entries["tuic/a"], entries["tuic/b"])
+			switch damage {
+			case "changed":
+				raw = strings.Replace(raw, entries["tuic/a"], entries["tuic/b"], 1)
+			case "missing":
+				raw = strings.Split(raw, "\n")[0] + "\n"
+			case "duplicate":
+				raw += raw
+			case "extra":
+				raw += fmt.Sprintf("%s  ./extra\n", entries["tuic/a"])
+			case "unbound":
+				entries = map[string]string{}
+			}
+			put(t, root, "tuic/evidence.sha256", []byte(raw))
+			if damage == "symlink" {
+				path := filepath.Join(root, "tuic/evidence.sha256")
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink("a", path); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := completeEvidence(root, entries); (err == nil) != (damage == "") {
+				t.Fatal(damage, err)
+			}
+		})
+	}
+}
 
 func TestReleaseAcceptsOnlyReviewedGenerations(t *testing.T) {
 	for _, label := range []string{"nhop-fork-cronet154-zlib-1", tuicLabel, "unreviewed"} {
