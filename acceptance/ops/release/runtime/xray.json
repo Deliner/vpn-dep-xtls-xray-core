@@ -1,0 +1,20 @@
+{
+  "version": "26.10.31",
+  "label": "nhop-fork-masque-fair-1",
+  "source_url": "https://codeload.github.com/Deliner/vpn-dep-xtls-xray-core/tar.gz/e257d40c752c32e5e7fba9c9a458538ff3dc26e3",
+  "source_sha256": "c43e4e8ff322a16d3a8e31452d41f1d52332a0cd591300ef8ef3649cd132e169",
+  "run_url": "https://github.com/Deliner/vpn-dep-xtls-xray-core/actions/runs/42528677860",
+  "workflow_sha": "071105d439d990311e539dc6866ba3fd02f1eefe",
+  "targets": {
+    "amd64": {
+      "binary_sha256": "12676d4e69482c6d3893b5d45f543c86065cdb45282894e429e5874101b7788c",
+      "inventory_sha256": "0623c5c110d5031e783916bcd104bbe57542b5f34bac9ea33d0a592367f11fba",
+      "evidence_sha256": "0fc442989dc9d00d1a6a6a4d027d935e0bd5adfc5eff116452ed50112fa57c53"
+    },
+    "arm64": {
+      "binary_sha256": "3f6ef30182f62239d9f978beb69c337db11351b3772459e2310fc88b6261abb4",
+      "inventory_sha256": "8c822c6da7f87da015d95da0574ee4b7798d5dcaf994911fc3d0826f7e6b075c",
+      "evidence_sha256": "fb43ed9d4e21af9c0798b77342c722e8aebc9bb222d7525365a880229885fce5"
+    }
+  }
+}

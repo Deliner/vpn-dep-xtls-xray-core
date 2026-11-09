@@ -5,7 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/identity.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/sources.sh"
 [[ $# -ge 1 && $# -le 2 && "$1" =~ ^build/acceptance/[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || exit 2
 suite="${2:-protocols}"
-case "$suite" in protocols) workflow=workflow.yml ;; cronet) workflow=cronet.yml ;; client) workflow=client/workflow.yml ;; *) exit 2 ;; esac
+case "$suite" in protocols) workflow=workflow.yml ;; cronet) workflow=cronet/workflow.yml ;; client) workflow=client/workflow.yml ;; installer) workflow=installer/workflow.yml ;; *) exit 2 ;; esac
 acceptance_identity
 [[ -z "$(git -C "$acceptance_root" status --porcelain --untracked-files=all)" ]] || { printf 'Commit and check the project before preparing CI.\n' >&2; exit 2; }
 for directory in "$acceptance_root/build" "$acceptance_root/build/acceptance"; do
@@ -34,6 +34,11 @@ git -C "$acceptance_checkout" -c protocol.file.allow=never fetch --depth=1 origi
 git -C "$acceptance_checkout" checkout -B nhop-acceptance FETCH_HEAD
 git -C "$acceptance_checkout" rm -r --ignore-unmatch .github/workflows acceptance
 acceptance_copy_sources "$acceptance_root" "$acceptance_checkout" "$acceptance_output"
+if [[ "$suite" == installer ]]; then
+  source "$acceptance_root/ops/testing/acceptance/installer/source.sh"
+  installer_previous_archive "$acceptance_root" "$acceptance_checkout/acceptance/previous-source.tar"
+  git -C "$acceptance_checkout" add --force -- acceptance/previous-source.tar
+fi
 mkdir -p "$acceptance_checkout/.github/workflows"
 cp "$acceptance_root/ops/testing/acceptance/$workflow" "$acceptance_checkout/.github/workflows/nhop-acceptance.yml"
 git -C "$acceptance_checkout" add .github/workflows/nhop-acceptance.yml

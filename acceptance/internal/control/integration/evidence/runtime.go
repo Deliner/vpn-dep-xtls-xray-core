@@ -1,3 +1,4 @@
+// Package evidence records the inputs used by native runtime integration tests.
 package evidence
 
 import (
@@ -12,6 +13,20 @@ import (
 	"vpn-script/internal/platform/process"
 	"vpn-script/internal/platform/safeio"
 )
+
+type Input struct {
+	Path            string
+	ExpectedVersion string
+}
+
+type Runtime struct {
+	Path              string `json:"path"`
+	ExpectedVersion   string `json:"expected_version"`
+	VersionOutput     string `json:"version_output"`
+	SHA256            string `json:"sha256"`
+	VerifiedUnchanged bool   `json:"verified_unchanged"`
+	Error             string `json:"error,omitempty"`
+}
 
 func Capture(ctx context.Context, inputs map[string]Input) (map[string]Runtime, error) {
 	if len(inputs) == 0 {

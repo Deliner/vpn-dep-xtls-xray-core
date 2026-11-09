@@ -1,0 +1,3 @@
+# Target CPU	previous installer SHA-256 (CGO=0, trimpath, buildvcs=false, empty buildid)
+amd64	0dbb675c21f9e9944e31cb0dc8f226aa91468d8966068f98ebc122ff57dd5582
+arm64	872ed1f4626c8556441133ceedc629b9529700173fdcf11ba68cb7a6d43320ca

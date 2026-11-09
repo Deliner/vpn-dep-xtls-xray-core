@@ -36,6 +36,9 @@ func (i *Installer) Install(data model.NodeConfig) (Result, error) {
 }
 
 func (i *Installer) installLocked(data model.NodeConfig) (string, error) {
+	if err := i.recoverTransaction(data); err != nil {
+		return "", err
+	}
 	state, err := i.state(data)
 	if err != nil {
 		return "", err

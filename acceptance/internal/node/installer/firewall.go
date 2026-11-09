@@ -63,7 +63,15 @@ func (i *Installer) restoreFirewall(previous []byte, changed bool) error {
 		return nil
 	}
 	if previous == nil {
-		i.probe("ufw", "--force", "delete", "allow", "VPN-NHOP")
+		current, err := optionalFile(i.Paths.Firewall)
+		if err != nil {
+			return err
+		}
+		if current != nil {
+			if _, err := i.command("ufw", "--force", "delete", "allow", "VPN-NHOP"); err != nil {
+				return err
+			}
+		}
 		return restoreFile(i.Paths.Firewall, nil, 0644)
 	}
 	if err := safeio.Atomic(i.Paths.Firewall, previous, 0644); err != nil {

@@ -13,7 +13,7 @@ case "$output" in
 esac
 root="$stage/vpn-script"
 install -d -m 0755 "$root"
-files=(.gitignore AGENTS.md README.md go.mod go.sum justfile .github/workflows/go.yml)
+files=(.gitignore AGENTS.md README.md go.mod go.sum justfile .github/workflows/go.yml ops/release/runtime/xray.json)
 
 while IFS= read -r -d '' source; do
   files+=("${source#"$repo_root/"}")
@@ -25,6 +25,9 @@ done < <(find "$repo_root/docs" -type f -name '*.md' ! -name '*.local.md' -print
 while IFS= read -r -d '' source; do
   files+=("${source#"$repo_root/"}")
 done < <(find "$repo_root/ops" -type f \( -name '*.sh' -o -name '*.md' -o -name '*.just' -o -name '*.tsv' -o -name '*.patch' \) ! -name '*.local.md' -print0)
+while IFS= read -r -d '' source; do
+  files+=("${source#"$repo_root/"}")
+done < <(find "$repo_root/ops/testing/acceptance" -type f -name '*.yml' -print0)
 # Candidate module locks are maintained inputs, not downloaded upstream source.
 while IFS= read -r -d '' source; do
   files+=("${source#"$repo_root/"}")

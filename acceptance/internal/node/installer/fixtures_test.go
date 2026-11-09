@@ -53,6 +53,8 @@ func (b *backend) run(ctx context.Context, _ time.Duration, args ...string) (pro
 		b.active = false
 	case "systemctl restart " + service, "systemctl start " + service:
 		b.active = true
+	case "systemctl enable " + service, "systemctl disable " + service:
+		b.enabled = strings.HasPrefix(command, "systemctl enable ")
 	}
 	return result, nil
 }
@@ -62,6 +64,15 @@ func (b *backend) response(command string) (string, bool) {
 		return output, true
 	}
 	switch command {
+	case "systemctl show -p LoadState -p ActiveState -p UnitFileState " + service:
+		active, enabled := "inactive", "disabled"
+		if b.active {
+			active = "active"
+		}
+		if b.enabled {
+			enabled = "enabled"
+		}
+		return fmt.Sprintf("LoadState=loaded\nActiveState=%s\nUnitFileState=%s\n", active, enabled), true
 	case "getent passwd " + account, "getent passwd 987":
 		return fmt.Sprintf("%s:x:987:%d::/nonexistent:/usr/sbin/nologin\n", account, testGroup()), true
 	case "getent group " + account, fmt.Sprintf("getent group %d", testGroup()):
@@ -110,7 +121,8 @@ func setup(t *testing.T, previous bool) (*Installer, *backend, model.NodeConfig,
 		require(t, os.Symlink(old, filepath.Join(root, "current")))
 		require(t, os.WriteFile(i.Paths.Unit, []byte(marker+"\nold unit\n"), 0644))
 		require(t, os.WriteFile(i.Paths.Firewall, []byte(marker+"\nold ports\n"), 0644))
-		require(t, os.WriteFile(filepath.Join(root, "state.json"), []byte("old state\n"), 0600))
+		require(t, safeio.JSON(filepath.Join(root, "state.json"), State{TopologyID: data.TopologyID, NodeID: data.NodeID,
+			Generation: strings.Repeat("a", 64), ConfigSHA256: safeio.Hash([]byte("{}")), BinarySHA256: safeio.Hash([]byte("binary")), Firewall: "preserve"}))
 	}
 	return i, b, data, new
 }

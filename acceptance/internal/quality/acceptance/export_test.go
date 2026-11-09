@@ -21,13 +21,13 @@ func TestSourceExportBuildsEmbeddedViewsAndExcludesPrivateInputs(t *testing.T) {
 		t.Fatalf("export: %v %s", err, output)
 	}
 	files := exportedFiles(t, archive)
-	for _, name := range []string{"internal/ui/views/page.html", "internal/ui/views/style.css"} {
+	for _, name := range []string{"internal/ui/views/page.html", "internal/ui/views/style.css", "ops/release/runtime/xray.json", "ops/testing/acceptance/installer/workflow.yml"} {
 		raw, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil || files[name] != string(raw) || !strings.Contains(files["ops/release/SHA256SUMS"], safeio.Hash(raw)+"  vpn-script/"+name+"\n") {
-			t.Fatalf("embedded build input missing or changed: %s", name)
+			t.Fatalf("maintained build input missing or changed: %s", name)
 		}
 	}
-	for _, name := range []string{"config.env", "build/private.html", ".ssh-custom/key.go", "docs/private.local.md"} {
+	for _, name := range []string{"config.env", "build/private.html", ".ssh-custom/key.go", "docs/private.local.md", "ops/release/runtime/private.json"} {
 		if _, found := files[name]; found {
 			t.Fatalf("private input exported: %s", name)
 		}
@@ -47,6 +47,8 @@ func exportFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	for _, name := range []string{".gitignore", "AGENTS.md", "README.md", "go.sum", "justfile", ".github/workflows/go.yml",
+		"ops/release/runtime/xray.json", "ops/release/runtime/private.json",
+		"ops/testing/acceptance/installer/workflow.yml",
 		"ops/runtime/inputs.tsv", "docs/public.md", "examples/example.yaml", "config.env", "build/private.html", ".ssh-custom/key.go", "docs/private.local.md"} {
 		write(t, filepath.Join(root, name), "fixture "+name+"\n", 0600)
 	}

@@ -31,11 +31,11 @@ func BenchmarkCompileFleet(b *testing.B) {
 }
 
 func TestNodeGenerationCompatibility(t *testing.T) {
-	// Canonical generations include the per-packet UDP exit policy. Relays keep
-	// their pre-indexing generations; exits deliberately change for this policy.
+	// Runtime archive identity is part of the canonical generation, including on
+	// relays. These snapshots include the published maintained Xray Linux assets.
 	want := map[bool][]string{
-		false: {"89ff936cdd7b06fc8cff7cb211a0e0374343068f2815dd9f82c04744c1f5fbf9", "24acc6b45e0eac947f87c5009da4d61a20b3f25d35374dae3d6c81f47ab5e377", "db231cab379622d9fdd8b6c4c87b6f57901411930853fe2c6b1b9d3eb5365417"},
-		true:  {"178dc4256bfb7a86b77d21456b9c94898edbe491c377af46433818d302514ec5", "a6ced1357d387d9e77c6178ddfaa65276aec0a7645f2f28468f599fd5a66f76a", "2e24eeee62a2ed6158a10a6f50a2f2ee73dfbf4f45c2bbbeba44094fe7b5a567"},
+		false: {"d1d7b9377caa7a928f0780c12950b200df3adad4afeccc073038f52d7832ad83", "366baf966884bc59ae50a8c1d5c23254d7fe3504ca42783506c428e7995fa888", "3355ffeaa5a1210643d028a3e2c841569c1b818868b9c5cac05c980384f9a399"},
+		true:  {"13e9fe3a75a05131caded51fc559dd5d96e0ba8fac7496a27b5bab3a02d6db9e", "0d281d9b09758f7a2f0d18308fa37f15addb5087932c0fb2cc3c4a716afd5d7a", "0b47d8a97dcb4bcc86ae1c289a4b91eeae44691fff0a5d762e9cbc8223446a40"},
 	}
 	for _, mixed := range []bool{false, true} {
 		top, state := fleetFixture(3, mixed)

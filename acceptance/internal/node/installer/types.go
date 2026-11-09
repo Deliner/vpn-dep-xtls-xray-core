@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"vpn-script/internal/node/journal"
 	"vpn-script/internal/platform/process"
 )
 
@@ -47,14 +48,7 @@ type preparedRelease struct {
 	created bool
 }
 
-type Snapshot struct {
-	Previous string
-	Unit     []byte
-	Firewall []byte
-	State    []byte
-	Active   bool
-	Enabled  bool
-}
+type Snapshot = journal.Snapshot
 
 type Result struct {
 	Node         string `json:"node"`

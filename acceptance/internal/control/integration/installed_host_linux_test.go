@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 	"vpn-script/internal/control/integration/evidence/diagnostics"
+	"vpn-script/internal/control/integration/evidence/installation"
 	"vpn-script/internal/core/model"
 	"vpn-script/internal/node/installer"
 	"vpn-script/internal/node/manifest"
@@ -26,9 +27,8 @@ const installedDropin = "/run/systemd/system/vpn-nhop.service.d"
 
 func installedGuard(t *testing.T) {
 	t.Helper()
-	host, err := os.Hostname()
-	require(t, err)
-	if os.Geteuid() != 0 || host != "lima-payload" || !filepath.IsAbs(os.Getenv("NHOP_NODE_BINARY")) || !filepath.IsAbs(os.Getenv("NHOP_SYSTEMD_REPORT")) {
+	require(t, installation.OwnedHost())
+	if !filepath.IsAbs(os.Getenv("NHOP_NODE_BINARY")) || !filepath.IsAbs(os.Getenv("NHOP_SYSTEMD_REPORT")) {
 		t.Fatal("requires root in the private Lima VM and absolute binary/report paths")
 	}
 	if previous := os.Getenv("NHOP_PREVIOUS_NODE_BINARY"); previous != "" && !filepath.IsAbs(previous) {
@@ -64,6 +64,9 @@ func installedCleanup(t *testing.T) {
 	if _, err := os.Lstat(installedUnit); err == nil && (stopErr != nil || !result.Success) {
 		t.Errorf("cannot stop test service; preserving state: %v: %s", stopErr, result.Output)
 		return
+	}
+	if !t.Failed() {
+		require(t, installation.CaptureInputs(filepath.Dir(os.Getenv("NHOP_SYSTEMD_REPORT"))))
 	}
 	for _, path := range []string{installedUnit, installedBase, installedDropin} {
 		if err := os.RemoveAll(path); err != nil {

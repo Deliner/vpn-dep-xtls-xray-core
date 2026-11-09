@@ -2,9 +2,11 @@ package integration
 
 import (
 	"bytes"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -234,5 +236,41 @@ func installedCorruptRollback(t *testing.T, l *lab, data model.NodeConfig, befor
 	require(t, err)
 	if !bytes.Equal(actual, changed) {
 		t.Fatal("rejected corrupt state silently repaired or replaced the old file")
+	}
+}
+
+func installedBindings(t *testing.T, data model.NodeConfig) (int, bool) {
+	t.Helper()
+	ports := map[string]int{}
+	for _, listener := range data.Listeners {
+		ports[listener.Tag+"/"+listener.Network] = listener.Port
+	}
+	tcp := ports["node0."+model.Reality+"/tcp"]
+	if tcp == 0 || ports["node0.tuic/udp"] != tcp {
+		t.Fatal("installed manifest lost its shared TCP/UDP listener pair")
+	}
+	return tcp, ports["node0.hysteria2/udp"] == 22
+}
+
+func installedOldPorts(t *testing.T, initial, updated model.NodeConfig) {
+	t.Helper()
+	current := map[string]bool{}
+	for _, listener := range updated.Listeners {
+		current[listener.Network+"/"+strconv.Itoa(listener.Port)] = true
+	}
+	for _, listener := range initial.Listeners {
+		if current[listener.Network+"/"+strconv.Itoa(listener.Port)] {
+			continue
+		}
+		address := net.JoinHostPort("127.0.0.1", strconv.Itoa(listener.Port))
+		if listener.Network == "tcp" {
+			bound, err := net.Listen("tcp4", address)
+			require(t, err)
+			require(t, bound.Close())
+		} else {
+			bound, err := net.ListenPacket("udp4", address)
+			require(t, err)
+			require(t, bound.Close())
+		}
 	}
 }

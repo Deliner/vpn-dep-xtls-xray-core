@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"vpn-script/internal/control/integration/evidence"
+	"vpn-script/internal/control/integration/evidence/installation"
 	"vpn-script/internal/core/dag"
 	"vpn-script/internal/core/model"
 	"vpn-script/internal/node/release"
@@ -18,7 +20,7 @@ import (
 )
 
 func TestInstalledNodeLifecycle(t *testing.T) {
-	if os.Getenv("NHOP_SYSTEMD_ACCEPTANCE") != "private-lima" {
+	if mode := os.Getenv("NHOP_SYSTEMD_ACCEPTANCE"); mode != "private-lima" && mode != "owned-native-ci" {
 		t.Skip("explicit private Linux VM acceptance only; use just lab-installer")
 	}
 	report := installedSuite{SchemaVersion: 1}
@@ -58,19 +60,6 @@ func TestInstalledNodeLifecycle(t *testing.T) {
 	require(t, evidence.Verify(report.Runtimes))
 }
 
-func installedBindings(t *testing.T, data model.NodeConfig) (int, bool) {
-	t.Helper()
-	ports := map[string]int{}
-	for _, listener := range data.Listeners {
-		ports[listener.Tag+"/"+listener.Network] = listener.Port
-	}
-	tcp := ports["node0."+model.Reality+"/tcp"]
-	if tcp == 0 || ports["node0.tuic/udp"] != tcp {
-		t.Fatal("installed manifest lost its shared TCP/UDP listener pair")
-	}
-	return tcp, ports["node0.hysteria2/udp"] == 22
-}
-
 func installedUpdateOffline(t *testing.T, l *lab, initial model.NodeConfig, report *installedSuite) {
 	t.Helper()
 	report.CachedArchives, report.CachedBytes = installedCache(t, initial)
@@ -82,6 +71,7 @@ func installedUpdateOffline(t *testing.T, l *lab, initial model.NodeConfig, repo
 		t.Fatal("cold cache probe did not reach the rejecting proxy")
 	}
 	report.CacheMissBlocked = true
+	installedInterrupted(t, l, initial, report)
 	installedUpdate(t, l, initial, report)
 	hashes, size := installedCache(t, initial)
 	report.CacheWarmRequests = requests.Load()
@@ -90,6 +80,32 @@ func installedUpdateOffline(t *testing.T, l *lab, initial model.NodeConfig, repo
 	}
 	report.CacheOffline = true
 	t.Logf("cache: %d verified bytes; cold probe %d requests, warm lifecycle %d requests", size, report.CacheProbeRequests, report.CacheWarmRequests)
+}
+
+func installedInterrupted(t *testing.T, l *lab, data model.NodeConfig, report *installedSuite) {
+	t.Helper()
+	before := installedCheckpoint(t, data)
+	path := filepath.Join(t.TempDir(), "interrupted-node.json")
+	require(t, safeio.JSON(path, installedChangedLogs(t, l)))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	require(t, installation.Gate(ctx))
+	reset := func() { require(t, installation.Ungate(context.Background())) }
+	defer reset()
+	proof, err := installation.KillInstaller(ctx, installedInstallerArgs(path), before.Directory, filepath.Dir(os.Getenv("NHOP_SYSTEMD_REPORT")))
+	require(t, err)
+	reset()
+	installedApply(t, data, "unchanged")
+	if after := installedCheckpoint(t, data); !reflect.DeepEqual(before, after) {
+		t.Fatal("SIGKILL recovery did not restore the previous release, unit and state")
+	}
+	if _, err := os.Lstat(installedBase + "/transaction.json"); !os.IsNotExist(err) {
+		t.Fatal("successful interrupted installation recovery retained its journal")
+	}
+	proof.Restored = true
+	report.Interruption = &proof
+	installedTraffic(t, l, "interrupted-restored", report)
+	installedUnchanged(t, data)
 }
 
 func installedCacheMiss(t *testing.T, l *lab, initial model.NodeConfig) {
@@ -156,29 +172,6 @@ func installedNextPorts(t *testing.T, l *lab, report *installedSuite) model.Node
 	t.Cleanup(func() { require(t, foreign.Close()) })
 	report.DisjointForeignSocket = foreign.Addr().String()
 	return installedConfig(t, l)
-}
-
-func installedOldPorts(t *testing.T, initial, updated model.NodeConfig) {
-	t.Helper()
-	current := map[string]bool{}
-	for _, listener := range updated.Listeners {
-		current[listener.Network+"/"+strconv.Itoa(listener.Port)] = true
-	}
-	for _, listener := range initial.Listeners {
-		if current[listener.Network+"/"+strconv.Itoa(listener.Port)] {
-			continue
-		}
-		address := net.JoinHostPort("127.0.0.1", strconv.Itoa(listener.Port))
-		if listener.Network == "tcp" {
-			bound, err := net.Listen("tcp4", address)
-			require(t, err)
-			require(t, bound.Close())
-		} else {
-			bound, err := net.ListenPacket("udp4", address)
-			require(t, err)
-			require(t, bound.Close())
-		}
-	}
 }
 
 func installedRollback(t *testing.T, l *lab, updated model.NodeConfig, report *installedSuite) {

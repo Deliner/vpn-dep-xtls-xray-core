@@ -4,7 +4,7 @@ umask 077
 [[ $# == 1 && "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || exit 2
 arch="$1"
 case "$arch" in amd64) cpu=x64 ;; arm64) cpu=arm64 ;; *) exit 2 ;; esac
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
 cd "$root"
 report="$root/build/acceptance-results"
 [[ ! -e "$report" && ! -L "$report" ]] || exit 2

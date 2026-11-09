@@ -22,6 +22,8 @@ GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOWORK=off go build -trimpath -buildvcs=
 GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOWORK=off go test -c -trimpath -buildvcs=false \
   -ldflags=-buildid= -o "$bundle/installer.test" "$root/internal/node/installer"
 GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOWORK=off go test -c -trimpath -buildvcs=false \
+  -ldflags=-buildid= -o "$bundle/journal.test" "$root/internal/node/journal"
+GOOS=linux GOARCH="$arch" CGO_ENABLED=0 GOWORK=off go test -c -trimpath -buildvcs=false \
   -ldflags=-buildid= -o "$bundle/node.test" "$root/cmd/nhop-node"
 package_test
 cp "$root/ops/testing/linux/installer/guest.sh" "$bundle/guest.sh"

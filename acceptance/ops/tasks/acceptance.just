@@ -28,17 +28,17 @@ acceptance-run arch:
 # Build a pinned Cronet Linux target on a native AMD64 runner, retaining source/toolchain/linkage evidence.
 [group('acceptance')]
 acceptance-cronet-run arch:
-    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet.sh "$1"
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet/run.sh "$1"
 
 # Verify native CPU and execute the compiled Cronet regression from a checksum-verified CI artifact.
 [group('acceptance')]
 acceptance-cronet-verify arch candidate:
-    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet-verify.sh "$1" "$2"
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet/verify.sh "$1" "$2"
 
 # Bind verified Go candidates to the new native library and test Naive H2/H3 TCP/UDP on native Linux.
 [group('acceptance')]
 acceptance-cronet-payload arch candidate output:
-    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet-payload.sh "$1" "$2" "$3"
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/cronet/payload.sh "$1" "$2" "$3"
 
 # Verify native Linux boot registration/ordering, all-protocol TUN and controller recovery with race instrumentation.
 [group('acceptance')]
@@ -49,6 +49,21 @@ acceptance-client-run arch:
 [group('acceptance')]
 acceptance-client-installed-verify directory policy:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/client/installed.sh "$1" "$2"
+
+# Build the previous node installer from a checksum-pinned committed source snapshot.
+[group('acceptance')]
+acceptance-installer-previous arch output:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/installer/previous.sh "$1" "$2"
+
+# Install published runtimes, upgrade the previous installer and recover from SIGKILL only on owned native Linux CI.
+[group('acceptance')]
+acceptance-installer-run arch:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/installer/run.sh "$1"
+
+# Independently verify native node installation, published runtime bytes and process-crash recovery evidence.
+[group('acceptance')]
+acceptance-installer-verify directory arch commit snapshot:
+    @bash ops/quality/check.sh static-analysis go run ./cmd/installcheck "$1" "$2" "$3" "$4"
 
 # Download a completed matching CI run, restore captured Actions policy and independently verify its evidence.
 [group('acceptance')]

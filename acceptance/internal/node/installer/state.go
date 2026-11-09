@@ -52,25 +52,6 @@ func (i *Installer) switchTo(target string) error {
 	return safeio.SyncDir(i.Paths.Base)
 }
 
-func optionalFile(path string) ([]byte, error) {
-	raw, err := safeio.Read(path, 10_000_000)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	return raw, err
-}
-
-func restoreFile(path string, contents []byte, mode os.FileMode) error {
-	if contents == nil {
-		err := os.Remove(path)
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	return safeio.Atomic(path, contents, mode)
-}
-
 func (i *Installer) state(data model.NodeConfig) (*State, error) {
 	var state State
 	err := safeio.LoadJSON(filepath.Join(i.Paths.Base, "state.json"), &state)
@@ -117,10 +98,10 @@ func (i *Installer) verifyCommitted(state *State) error {
 	return release.Verify(directory, files, os.Geteuid(), group)
 }
 
-func (i *Installer) commit(data model.NodeConfig, directory string, old Snapshot) error {
+func (i *Installer) nextState(data model.NodeConfig, directory string, old Snapshot) ([]byte, error) {
 	hashes, err := release.Inventory(directory, data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	state := State{TopologyID: data.TopologyID, NodeID: data.NodeID, Generation: data.Generation, ReleaseID: filepath.Base(directory),
 		Firewall: data.Firewall, Verification: "engine processes and local listeners only; external route verification pending"}
@@ -132,12 +113,30 @@ func (i *Installer) commit(data model.NodeConfig, directory string, old Snapshot
 	if old.Previous != "" {
 		var previous State
 		if err := json.Unmarshal(old.State, &previous); err != nil {
-			return fmt.Errorf("cannot preserve previous release identity: %w", err)
+			return nil, fmt.Errorf("cannot preserve previous release identity: %w", err)
 		}
 		state.PreviousGeneration, state.PreviousReleaseID = previous.Generation, filepath.Base(old.Previous)
 		if directory == old.Previous {
 			state.PreviousGeneration, state.PreviousReleaseID = previous.PreviousGeneration, previous.PreviousReleaseID
 		}
 	}
-	return safeio.JSON(filepath.Join(i.Paths.Base, "state.json"), state)
+	return safeio.FormattedJSON(state)
+}
+
+func (i *Installer) verifySnapshot(snapshot Snapshot, data model.NodeConfig) error {
+	if snapshot.Previous == "" {
+		if snapshot.State != nil {
+			return fmt.Errorf("transaction state has no committed release")
+		}
+		return nil
+	}
+	var state State
+	if err := json.Unmarshal(snapshot.State, &state); err != nil {
+		return err
+	}
+	if state.TopologyID != data.TopologyID || state.NodeID != data.NodeID || !validate.Hash(state.Generation) ||
+		filepath.Base(snapshot.Previous) != state.releaseID() {
+		return fmt.Errorf("transaction snapshot does not identify the owned committed release")
+	}
+	return i.verifyCommitted(&state)
 }

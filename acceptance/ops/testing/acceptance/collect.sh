@@ -26,11 +26,11 @@ if [[ "$suite" == cronet ]]; then
     (cd "$report"; shasum -a 256 --check evidence.sha256) > "$report/integrity-verification.log"
     (cd "$report"; shasum -a 256 --check SHA256SUMS) >> "$report/integrity-verification.log"
     cmp "$report/source.tsv" <(sed '/^#/d' "$acceptance_checkout/acceptance/ops/runtime/cronet/source.tsv")
-    if [[ -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet-verify.sh" ]]; then
+    if [[ -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet-verify.sh" || -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet/verify.sh" ]]; then
       verification="$collection/cronet-native-$arch"
       [[ "$(cat "$verification/status")" == passed && -s "$verification/range.log" ]] || exit 1
       (cd "$verification"; shasum -a 256 --check evidence.sha256) > "$verification/integrity-verification.log"
-      if [[ -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet-payload.sh" ]]; then
+      if [[ -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet-payload.sh" || -f "$acceptance_checkout/acceptance/ops/testing/acceptance/cronet/payload.sh" ]]; then
         [[ "$(cat "$verification/naive/status")" == passed ]] || exit 1
         (cd "$verification/naive"; shasum -a 256 --check evidence.sha256; shasum -a 256 --check runtime.sha256) >> "$verification/integrity-verification.log"
         cmp "$verification/naive/bin/libcronet.so" "$report/bin/libcronet.so"
@@ -45,6 +45,12 @@ if [[ "$suite" == client ]]; then
   bash "$acceptance_root/ops/testing/acceptance/client/collect.sh" "$collection" "$acceptance_commit" "$acceptance_checkout/acceptance"
   printf 'verified\n' > "$acceptance_output/status"
   printf 'Native Linux client acceptance verified: %s\n' "$collection"
+  exit 0
+fi
+if [[ "$suite" == installer ]]; then
+  bash "$acceptance_root/ops/testing/acceptance/installer/collect.sh" "$collection" "$acceptance_commit" "$acceptance_checkout/acceptance"
+  printf 'verified\n' > "$acceptance_output/status"
+  printf 'Native Linux installer acceptance verified: %s\n' "$collection"
   exit 0
 fi
 [[ "$suite" == protocols ]] || exit 2

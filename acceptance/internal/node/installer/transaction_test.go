@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"vpn-script/internal/core/model"
 	"vpn-script/internal/platform/process"
@@ -16,6 +17,8 @@ import (
 
 func TestFailedUpdateRestoresReleaseUnitFirewallAndState(t *testing.T) {
 	i, backend, data, next := setup(t, true)
+	before, err := os.ReadFile(filepath.Join(i.Paths.Base, "state.json"))
+	require(t, err)
 	data.Firewall, backend.fail = "ufw", "systemctl enable "+service
 	if err := i.activate(data, next); err == nil {
 		t.Fatal("injected failure was ignored")
@@ -26,7 +29,7 @@ func TestFailedUpdateRestoresReleaseUnitFirewallAndState(t *testing.T) {
 		t.Fatal("release pointer not rolled back")
 	}
 	for path, expected := range map[string]string{i.Paths.Unit: marker + "\nold unit\n", i.Paths.Firewall: marker + "\nold ports\n",
-		filepath.Join(i.Paths.Base, "state.json"): "old state\n"} {
+		filepath.Join(i.Paths.Base, "state.json"): string(before)} {
 		contents, err := os.ReadFile(path)
 		require(t, err)
 		if string(contents) != expected {
@@ -54,8 +57,14 @@ func TestFirstInstallFailureRemovesPointerAndUnit(t *testing.T) {
 func TestCancellationDoesNotCancelRollback(t *testing.T) {
 	i, backend, data, next := setup(t, true)
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	defer cancel()
 	i.Context = ctx
+	i.Run = func(ctx context.Context, limit time.Duration, args ...string) (process.Result, error) {
+		if strings.Join(args, " ") == "systemctl restart "+service {
+			cancel()
+		}
+		return backend.run(ctx, limit, args...)
+	}
 	if err := i.activate(data, next); err == nil {
 		t.Fatal("cancelled apply unexpectedly succeeded")
 	}
@@ -207,6 +216,8 @@ func TestMultiEngineCommitDetectsEveryFileDrift(t *testing.T) {
 
 func TestFailedMultiEngineCommitRollsBackToLegacyRelease(t *testing.T) {
 	i, _, data, next := setup(t, true)
+	before, err := os.ReadFile(filepath.Join(i.Paths.Base, "state.json"))
+	require(t, err)
 	programRelease(t, &data, next)
 	require(t, os.Remove(filepath.Join(next, "libcronet.so")))
 	if err := i.activate(data, next); err == nil {
@@ -224,7 +235,7 @@ func TestFailedMultiEngineCommitRollsBackToLegacyRelease(t *testing.T) {
 	}
 	state, err := os.ReadFile(filepath.Join(i.Paths.Base, "state.json"))
 	require(t, err)
-	if string(state) != "old state\n" {
+	if string(state) != string(before) {
 		t.Fatal("previous state not restored")
 	}
 }

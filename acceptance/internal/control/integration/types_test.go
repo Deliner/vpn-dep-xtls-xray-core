@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"vpn-script/internal/control/integration/evidence"
+	"vpn-script/internal/control/integration/evidence/installation"
 	"vpn-script/internal/control/integration/selection"
 	"vpn-script/internal/control/integration/traffic"
 	"vpn-script/internal/core/model"
@@ -69,6 +70,7 @@ type installedSuite struct {
 	UnitRepaired             bool                         `json:"unit_repaired"`
 	PreviousSHA              string                       `json:"previous_installer_sha256,omitempty"`
 	InstallerSHA             string                       `json:"installer_sha256,omitempty"`
+	Interruption             *installation.Report         `json:"installer_interruption,omitempty"`
 	CachedArchives           map[string]string            `json:"cached_archives_sha256"`
 	CachedBytes              int64                        `json:"cached_archive_bytes"`
 	CacheMissBlocked         bool                         `json:"cache_miss_blocked"`

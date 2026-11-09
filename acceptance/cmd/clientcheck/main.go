@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"vpn-script/internal/quality/acceptance/installed"
+	installed "vpn-script/internal/quality/acceptance/installation/client"
 )
 
 func main() {
