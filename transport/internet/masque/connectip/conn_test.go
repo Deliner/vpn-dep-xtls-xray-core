@@ -383,7 +383,7 @@ func TestIncomingDatagrams(t *testing.T) {
 }
 
 func TestSkipUnknownCapsule(t *testing.T) {
-	for _, typ := range []http3.CapsuleType{42, capsuleTypeDatagram} {
+	for _, typ := range []http3.CapsuleType{42, 43} {
 		readChan := make(chan []byte, 1)
 		conn := newProxiedConn(&mockStream{toRead: readChan})
 

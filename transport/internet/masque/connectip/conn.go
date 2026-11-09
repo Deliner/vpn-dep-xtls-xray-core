@@ -73,6 +73,7 @@ type streamWrite struct {
 type Conn struct {
 	str         requestStream
 	h3          http3Stream
+	h3Receiver  *datagramReceiver
 	datagrams   chan []byte
 	writeMu     sync.Mutex
 	writeNotify chan struct{}
@@ -95,8 +96,6 @@ type Conn struct {
 	closeOnce   sync.Once
 	closeResult error
 
-	datagramCapsuleOnce sync.Once
-
 	bare bool
 }
 
@@ -112,6 +111,7 @@ func startProxiedConn(str requestStream, bare bool) *Conn {
 	c := &Conn{
 		bare:                   bare,
 		str:                    str,
+		datagrams:              make(chan []byte, maxQueuedDatagrams),
 		writeNotify:            make(chan struct{}, 1),
 		writeDone:              make(chan error, 1),
 		assignedAddressUpdates: make(chan []AssignedAddress, maxQueuedCapsules),
@@ -119,8 +119,8 @@ func startProxiedConn(str requestStream, bare bool) *Conn {
 		availableRouteUpdates:  make(chan []IPRoute, 1),
 		closeChan:              make(chan struct{}),
 	}
-	if c.h3, _ = str.(http3Stream); c.h3 == nil {
-		c.datagrams = make(chan []byte, maxQueuedDatagrams)
+	if c.h3, _ = str.(http3Stream); c.h3 != nil {
+		c.h3Receiver = newDatagramReceiver(c.h3)
 	}
 	go func() {
 		err := c.readFromStream()
@@ -129,6 +129,7 @@ func startProxiedConn(str requestStream, bare bool) *Conn {
 		if !closing {
 			c.closeErr = &CloseError{Remote: true}
 			close(c.closeChan)
+			c.h3Receiver.stop()
 			if err != nil {
 				code := http3.ErrCodeMessageError
 				var streamErr *quic.StreamError
@@ -159,6 +160,7 @@ func startProxiedConn(str requestStream, bare bool) *Conn {
 			if !closing {
 				c.closeErr = &CloseError{Remote: true}
 				close(c.closeChan)
+				c.h3Receiver.stop()
 				c.str.CancelRead(quic.StreamErrorCode(http3.ErrCodeExcessiveLoad))
 				c.str.CancelWrite(quic.StreamErrorCode(http3.ErrCodeExcessiveLoad))
 			} else {
@@ -322,6 +324,7 @@ func (c *Conn) queueWrite(w streamWrite) error {
 	if len(c.queuedWrites) >= maxQueuedCapsules {
 		c.closeErr = &CloseError{Remote: false}
 		close(c.closeChan)
+		c.h3Receiver.stop()
 		c.str.CancelRead(quic.StreamErrorCode(http3.ErrCodeExcessiveLoad))
 		c.str.CancelWrite(quic.StreamErrorCode(http3.ErrCodeExcessiveLoad))
 		close(c.writeNotify)
@@ -413,16 +416,7 @@ func (c *Conn) readFromStream() error {
 			}
 			queueLatest(c.availableRouteUpdates, capsule.IPAddressRanges)
 		case capsuleTypeDatagram:
-			if c.h3 == nil {
-				if err := c.queueDatagram(cr); err != nil {
-					return err
-				}
-				continue
-			}
-			c.datagramCapsuleOnce.Do(func() {
-				errors.LogWarning(context.Background(), "connect-ip: dropping IP packets sent in DATAGRAM capsules, only QUIC DATAGRAM frames are supported")
-			})
-			if err := cr.Discard(); err != nil {
+			if err := c.queueDatagram(cr); err != nil {
 				return err
 			}
 		default:
@@ -481,12 +475,19 @@ func (c *Conn) queueDatagram(cr http3.CapsuleReader) error {
 }
 
 func (c *Conn) receiveDatagram() ([]byte, error) {
-	if c.h3 != nil {
-		return c.h3.ReceiveDatagram(context.Background())
+	var packets <-chan []byte
+	var done <-chan struct{}
+	if c.h3Receiver != nil {
+		c.h3Receiver.start()
+		packets, done = c.h3Receiver.packets, c.h3Receiver.done
 	}
 	select {
 	case data := <-c.datagrams:
 		return data, nil
+	case data := <-packets:
+		return data, nil
+	case <-done:
+		return nil, c.h3Receiver.err
 	case <-c.closeChan:
 		return nil, c.closeErr
 	}
@@ -709,6 +710,7 @@ func (c *Conn) Close() error {
 		if c.closeErr == nil {
 			c.closeErr = &CloseError{Remote: false}
 			close(c.closeChan)
+			c.h3Receiver.stop()
 			c.queueFin()
 		}
 		c.mu.Unlock()
