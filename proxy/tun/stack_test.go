@@ -565,7 +565,7 @@ func TestTCPLargeSegment(t *testing.T) {
 	}
 }
 
-// What the system does not acknowledge is sent again: at once when it says what it has past it, or after a while.
+// Missing data is retransmitted once SACK supplies the loss threshold, or after a timeout.
 func TestTCPRetransmit(t *testing.T) {
 	conns := make(chan accepted, 1)
 	p, l := newPeer(t, "10.0.0.1:1234", "10.0.0.2:80")
@@ -573,16 +573,16 @@ func TestTCPRetransmit(t *testing.T) {
 	p.connect([]byte{2, 4, 0, 100, 4, 2, 0, 0})
 	a := take(t, conns)
 
-	sent := make([]byte, 450)
+	sent := make([]byte, 550)
 	rand.Read(sent)
 	go func() {
 		if err := a.conn.(buf.Writer).WriteMultiBuffer(buf.MergeBytes(nil, sent)); err != nil {
 			t.Error(err)
 		}
 	}()
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 6; i++ {
 		limit := 100
-		if i == 4 {
+		if i == 5 {
 			limit = 50
 		}
 		if s := p.receive(); s.seq != p.ack+uint32(100*i) || !bytes.Equal(s.payload, sent[100*i:100*i+limit]) {
@@ -596,23 +596,24 @@ func TestTCPRetransmit(t *testing.T) {
 		b := []byte{1, 1, 5, 10}
 		return binary.BigEndian.AppendUint32(binary.BigEndian.AppendUint32(b, from), to)
 	}
-	p.send(p.seq, tcpAck, block(p.ack+200, p.ack+350), nil)
+	// Three later segments (250 bytes > 2*MSS) supply evidence of loss.
+	p.send(p.seq, tcpAck, block(p.ack+200, p.ack+450), nil)
 	for i := 1; i < 3; i++ {
 		if s := p.receive(); s.seq != p.ack+uint32(100*(i-1)) || !bytes.Equal(s.payload, sent[100*i:100*i+100]) {
 			t.Fatal("segment ", i, " sent again: seq ", s.seq-p.ack, " with ", len(s.payload), " bytes")
 		}
 	}
 	// said again, it is not sent again
-	p.send(p.seq, tcpAck, block(p.ack+200, p.ack+350), nil)
+	p.send(p.seq, tcpAck, block(p.ack+200, p.ack+450), nil)
 	p.silent(tcpTick)
 	// the one that was sent again came, the other one did not: it is sent after a while, without what the system has
 	p.ack += 100
-	p.send(p.seq, tcpAck, block(p.ack+100, p.ack+250), nil)
+	p.send(p.seq, tcpAck, block(p.ack+100, p.ack+350), nil)
 	p.silent(tcpTick)
 	if s := p.receive(); s.seq != p.ack || !bytes.Equal(s.payload, sent[200:300]) {
 		t.Fatal("segment 2 sent again later: seq ", s.seq-p.ack, " with ", len(s.payload), " bytes")
 	}
-	p.ack += 250
+	p.ack += 350
 	p.send(p.seq, tcpAck, nil, nil)
 	p.silent(2 * tcpRetransmitTicks * tcpTick)
 }
@@ -754,9 +755,16 @@ func TestTCPLossAgain(t *testing.T) {
 	if cwnd, _, _, _ := state(); cwnd != 300 {
 		t.Fatal("the way takes ", cwnd, " after one acknowledgment for all that was lost")
 	}
+	// Allow four segments in flight, so three later segments can identify
+	// the next loss without confusing two reordered packets with a loss.
+	p.ack += 100
+	p.send(p.seq, tcpAck, nil, nil)
+	for range 2 {
+		p.receive()
+	}
 	// the next loss on the connection: its first segment is sent again once, whatever time the last loss has left
 	time.Sleep(tcpTick)
-	p.send(p.seq, tcpAck, has(p, 100, 300), nil)
+	p.send(p.seq, tcpAck, has(p, 100, 400), nil)
 	again(p, "the first of the next loss")
 	if s := p.receive(); s.seq == p.ack {
 		t.Fatal("the first of the next loss is sent again twice")

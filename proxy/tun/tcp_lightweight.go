@@ -579,23 +579,15 @@ func (c *tcpConn) acknowledge(s segment) {
 				c.cwnd = min(c.cwnd+max(uint32(uint64(c.mss)*uint64(acked)/uint64(c.cwnd)), 1), uint32(c.window))
 			}
 		}
-	} else if sent != 0 && window == c.sndWnd && len(s.payload) == 0 && s.flags&tcpFin == 0 {
+	} else if !c.sack && sent != 0 && window == c.sndWnd && len(s.payload) == 0 && s.flags&tcpFin == 0 {
 		c.dupAcks++
 	}
 	if c.sack {
-		for kind, value, o := nextOption(s.options); kind != 0; kind, value, o = nextOption(o) {
-			for ; kind == 5 && len(value) >= 8; value = value[8:] {
-				// of what was sent and is not acknowledged
-				start, end := binary.BigEndian.Uint32(value)-c.sndUna, binary.BigEndian.Uint32(value[4:])-c.sndUna
-				if start != 0 && start < end && end <= c.sndNxt-c.sndUna {
-					c.sackAdd(c.sndUna+start, c.sndUna+end)
-				}
-			}
-		}
+		c.acknowledgeSACK(s.options)
 	}
-	if !c.recovering && c.sndUna != c.sndNxt && (len(c.sacked) > 0 || !c.sack && c.dupAcks >= 3) {
-		// the system has something past sndUna, or says the same for the third time when it cannot say what it has:
-		// the segment at sndUna is lost. One that can say it repeats itself also for what it got twice
+	if !c.recovering && c.sndUna != c.sndNxt && c.lossIndicated() {
+		// Wait for enough evidence of loss: one reordered segment, or
+		// repeated SACK information about it, must not halve the window.
 		c.congested()
 		c.lost = c.sndUna + min(uint32(c.mss), c.sndNxt-c.sndUna)
 	}
