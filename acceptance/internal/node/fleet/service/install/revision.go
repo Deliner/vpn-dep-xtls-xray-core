@@ -19,7 +19,9 @@ func (s *store) publish(options Options, binary []byte) (string, error) {
 		return "", err
 	}
 	directory := filepath.Join(s.base, "releases", id)
-	unit, err := service.Unit(filepath.Join(directory, "nhop-fleet"), value.State, options.Interval)
+	// The unit names the permanent installation; the store owns staged file access.
+	executable := filepath.Join(service.Directory, "releases", id, "nhop-fleet")
+	unit, err := service.Unit(executable, value.State, options.Interval)
 	if err != nil {
 		return "", err
 	}

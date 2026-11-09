@@ -1,0 +1,433 @@
+# All available profiles on each VM. Example IPs; replace before deployment.
+# Private TLS certificates are generated unless tls certificate/key files are supplied.
+version: 1
+name: protocol-fleet
+nodes:
+  entry:
+    address: 192.0.2.10
+    bridge_port_start: 40000
+    firewall: preserve
+    ssh:
+      user: root
+      port: 22222
+      closed_ports: [22]
+      identity_file: ~/.ssh-custom/vpn-fleet
+      known_hosts_file: ~/.ssh-custom/known_hosts
+    services:
+      anytls:
+        protocol: anytls
+        port: 24443
+        server_name: entry.vpn.example
+      hysteria2:
+        protocol: hysteria2
+        port: 24444
+        server_name: entry.vpn.example
+      hysteria2-gecko:
+        protocol: hysteria2-gecko
+        port: 24445
+        server_name: entry.vpn.example
+      hysteria2-salamander:
+        protocol: hysteria2-salamander
+        port: 24446
+        server_name: entry.vpn.example
+      masque-h2:
+        protocol: masque-h2
+        port: 24447
+        server_name: entry.vpn.example
+      masque-h3:
+        protocol: masque-h3
+        port: 24448
+        server_name: entry.vpn.example
+      naive-h2:
+        protocol: naive-h2
+        port: 24449
+        server_name: entry.vpn.example
+      naive-h3:
+        protocol: naive-h3
+        port: 24450
+        server_name: entry.vpn.example
+      shadowsocks:
+        protocol: shadowsocks
+        port: 24451
+      shadowsocks-2022:
+        protocol: shadowsocks-2022
+        port: 24452
+      shadowtls-v3:
+        protocol: shadowtls-v3
+        port: 24453
+        server_name: www.example.org
+        target: www.example.org:443
+      snell-v5:
+        protocol: snell-v5
+        port: 24454
+      snell-v6:
+        protocol: snell-v6
+        port: 24455
+      trojan:
+        protocol: trojan
+        port: 24456
+        server_name: entry.vpn.example
+      trojan-ws:
+        protocol: trojan-ws
+        port: 24457
+        server_name: entry.vpn.example
+        path: /vpn
+      tuic:
+        protocol: tuic
+        port: 24458
+        server_name: entry.vpn.example
+      vless-encryption:
+        protocol: vless-encryption
+        port: 24459
+      vless-reality:
+        protocol: vless-reality
+        port: 24460
+        server_name: www.example.org
+        target: www.example.org:443
+      vless-tls:
+        protocol: vless-tls
+        port: 24461
+        server_name: entry.vpn.example
+      vless-ws:
+        protocol: vless-ws
+        port: 24462
+        server_name: entry.vpn.example
+        path: /vpn
+      vless-xhttp:
+        protocol: vless-xhttp
+        port: 24463
+        server_name: entry.vpn.example
+        path: /vpn
+      vmess-tls:
+        protocol: vmess-tls
+        port: 24464
+        server_name: entry.vpn.example
+      vmess-ws:
+        protocol: vmess-ws
+        port: 24465
+        server_name: entry.vpn.example
+        path: /vpn
+  relay:
+    address: 192.0.2.20
+    bridge_port_start: 40000
+    firewall: preserve
+    ssh:
+      user: root
+      port: 22222
+      closed_ports: [22]
+      identity_file: ~/.ssh-custom/vpn-fleet
+      known_hosts_file: ~/.ssh-custom/known_hosts
+    services:
+      anytls:
+        protocol: anytls
+        port: 24443
+        server_name: relay.vpn.example
+      hysteria2:
+        protocol: hysteria2
+        port: 24444
+        server_name: relay.vpn.example
+      hysteria2-gecko:
+        protocol: hysteria2-gecko
+        port: 24445
+        server_name: relay.vpn.example
+      hysteria2-salamander:
+        protocol: hysteria2-salamander
+        port: 24446
+        server_name: relay.vpn.example
+      masque-h2:
+        protocol: masque-h2
+        port: 24447
+        server_name: relay.vpn.example
+      masque-h3:
+        protocol: masque-h3
+        port: 24448
+        server_name: relay.vpn.example
+      naive-h2:
+        protocol: naive-h2
+        port: 24449
+        server_name: relay.vpn.example
+      naive-h3:
+        protocol: naive-h3
+        port: 24450
+        server_name: relay.vpn.example
+      shadowsocks:
+        protocol: shadowsocks
+        port: 24451
+      shadowsocks-2022:
+        protocol: shadowsocks-2022
+        port: 24452
+      shadowtls-v3:
+        protocol: shadowtls-v3
+        port: 24453
+        server_name: www.example.org
+        target: www.example.org:443
+      snell-v5:
+        protocol: snell-v5
+        port: 24454
+      snell-v6:
+        protocol: snell-v6
+        port: 24455
+      trojan:
+        protocol: trojan
+        port: 24456
+        server_name: relay.vpn.example
+      trojan-ws:
+        protocol: trojan-ws
+        port: 24457
+        server_name: relay.vpn.example
+        path: /vpn
+      tuic:
+        protocol: tuic
+        port: 24458
+        server_name: relay.vpn.example
+      vless-encryption:
+        protocol: vless-encryption
+        port: 24459
+      vless-reality:
+        protocol: vless-reality
+        port: 24460
+        server_name: www.example.org
+        target: www.example.org:443
+      vless-tls:
+        protocol: vless-tls
+        port: 24461
+        server_name: relay.vpn.example
+      vless-ws:
+        protocol: vless-ws
+        port: 24462
+        server_name: relay.vpn.example
+        path: /vpn
+      vless-xhttp:
+        protocol: vless-xhttp
+        port: 24463
+        server_name: relay.vpn.example
+        path: /vpn
+      vmess-tls:
+        protocol: vmess-tls
+        port: 24464
+        server_name: relay.vpn.example
+      vmess-ws:
+        protocol: vmess-ws
+        port: 24465
+        server_name: relay.vpn.example
+        path: /vpn
+  exit:
+    address: 192.0.2.30
+    bridge_port_start: 40000
+    firewall: preserve
+    ssh:
+      user: root
+      port: 22222
+      closed_ports: [22]
+      identity_file: ~/.ssh-custom/vpn-fleet
+      known_hosts_file: ~/.ssh-custom/known_hosts
+    services:
+      anytls:
+        protocol: anytls
+        port: 24443
+        server_name: exit.vpn.example
+      hysteria2:
+        protocol: hysteria2
+        port: 24444
+        server_name: exit.vpn.example
+      hysteria2-gecko:
+        protocol: hysteria2-gecko
+        port: 24445
+        server_name: exit.vpn.example
+      hysteria2-salamander:
+        protocol: hysteria2-salamander
+        port: 24446
+        server_name: exit.vpn.example
+      masque-h2:
+        protocol: masque-h2
+        port: 24447
+        server_name: exit.vpn.example
+      masque-h3:
+        protocol: masque-h3
+        port: 24448
+        server_name: exit.vpn.example
+      naive-h2:
+        protocol: naive-h2
+        port: 24449
+        server_name: exit.vpn.example
+      naive-h3:
+        protocol: naive-h3
+        port: 24450
+        server_name: exit.vpn.example
+      shadowsocks:
+        protocol: shadowsocks
+        port: 24451
+      shadowsocks-2022:
+        protocol: shadowsocks-2022
+        port: 24452
+      shadowtls-v3:
+        protocol: shadowtls-v3
+        port: 24453
+        server_name: www.example.org
+        target: www.example.org:443
+      snell-v5:
+        protocol: snell-v5
+        port: 24454
+      snell-v6:
+        protocol: snell-v6
+        port: 24455
+      trojan:
+        protocol: trojan
+        port: 24456
+        server_name: exit.vpn.example
+      trojan-ws:
+        protocol: trojan-ws
+        port: 24457
+        server_name: exit.vpn.example
+        path: /vpn
+      tuic:
+        protocol: tuic
+        port: 24458
+        server_name: exit.vpn.example
+      vless-encryption:
+        protocol: vless-encryption
+        port: 24459
+      vless-reality:
+        protocol: vless-reality
+        port: 24460
+        server_name: www.example.org
+        target: www.example.org:443
+      vless-tls:
+        protocol: vless-tls
+        port: 24461
+        server_name: exit.vpn.example
+      vless-ws:
+        protocol: vless-ws
+        port: 24462
+        server_name: exit.vpn.example
+        path: /vpn
+      vless-xhttp:
+        protocol: vless-xhttp
+        port: 24463
+        server_name: exit.vpn.example
+        path: /vpn
+      vmess-tls:
+        protocol: vmess-tls
+        port: 24464
+        server_name: exit.vpn.example
+      vmess-ws:
+        protocol: vmess-ws
+        port: 24465
+        server_name: exit.vpn.example
+        path: /vpn
+routes:
+  anytls:
+    path: [entry.anytls, relay.hysteria2, exit.hysteria2-gecko]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10808
+  hysteria2:
+    path: [entry.hysteria2, relay.hysteria2-gecko, exit.hysteria2-salamander]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10809
+  hysteria2-gecko:
+    path: [entry.hysteria2-gecko, relay.hysteria2-salamander, exit.masque-h2]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10810
+  hysteria2-salamander:
+    path: [entry.hysteria2-salamander, relay.masque-h2, exit.masque-h3]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10811
+  masque-h2:
+    path: [entry.masque-h2, relay.masque-h3, exit.naive-h2]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10812
+  masque-h3:
+    path: [entry.masque-h3, relay.naive-h2, exit.naive-h3]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10813
+  naive-h2:
+    path: [entry.naive-h2, relay.naive-h3, exit.shadowsocks]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10814
+  naive-h3:
+    path: [entry.naive-h3, relay.shadowsocks, exit.shadowsocks-2022]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10815
+  shadowsocks:
+    path: [entry.shadowsocks, relay.shadowsocks-2022, exit.shadowtls-v3]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10816
+  shadowsocks-2022:
+    path: [entry.shadowsocks-2022, relay.shadowtls-v3, exit.snell-v5]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10817
+  shadowtls-v3:
+    path: [entry.shadowtls-v3, relay.snell-v5, exit.snell-v6]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10818
+  snell-v5:
+    path: [entry.snell-v5, relay.snell-v6, exit.trojan]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10819
+  snell-v6:
+    path: [entry.snell-v6, relay.trojan, exit.trojan-ws]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10820
+  trojan:
+    path: [entry.trojan, relay.trojan-ws, exit.tuic]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10821
+  trojan-ws:
+    path: [entry.trojan-ws, relay.tuic, exit.vless-encryption]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10822
+  tuic:
+    path: [entry.tuic, relay.vless-encryption, exit.vless-reality]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10823
+  vless-encryption:
+    path: [entry.vless-encryption, relay.vless-reality, exit.vless-tls]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10824
+  vless-reality:
+    path: [entry.vless-reality, relay.vless-tls, exit.vless-ws]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10825
+  vless-tls:
+    path: [entry.vless-tls, relay.vless-ws, exit.vless-xhttp]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10826
+  vless-ws:
+    path: [entry.vless-ws, relay.vless-xhttp, exit.vmess-tls]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10827
+  vless-xhttp:
+    path: [entry.vless-xhttp, relay.vmess-tls, exit.vmess-ws]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10828
+  vmess-tls:
+    path: [entry.vmess-tls, relay.vmess-ws, exit.anytls]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10829
+  vmess-ws:
+    path: [entry.vmess-ws, relay.anytls, exit.hysteria2]
+    expected_exit_ip: 192.0.2.30
+    client:
+      socks_port: 10830

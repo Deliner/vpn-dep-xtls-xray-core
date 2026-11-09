@@ -4,7 +4,7 @@ acceptance_copy_sources() {
   local project="$1" checkout="$2" output="$3" tracked archived
   mkdir "$checkout/acceptance"
   git -C "$project" archive --format=tar HEAD go.mod go.sum justfile cmd internal \
-    ops examples/nhop/topology.yaml > "$output/source.tar"
+    ops examples/nhop/topology.yaml examples/nhop/protocols.yaml > "$output/source.tar"
   tar -xf "$output/source.tar" -C "$checkout/acceptance"
   printf 'project_commit=%s\nsource_archive_sha256=%s\n' "$(git -C "$project" rev-parse HEAD)" \
     "$(shasum -a 256 "$output/source.tar" | awk '{print $1}')" > "$checkout/acceptance/source.txt"

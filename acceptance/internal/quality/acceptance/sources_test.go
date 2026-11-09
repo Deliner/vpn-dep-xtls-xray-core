@@ -11,7 +11,8 @@ import (
 func TestCopyPreservesTrackedSourcesIgnoredByParentRepository(t *testing.T) {
 	f := newFixture(t)
 	files := []string{"go.mod", "go.sum", "justfile", "cmd/main.go", "internal/runtime/xray/runtime.go", "internal/control/coverage.go",
-		"internal/control/fleet/panel/views/layout.html", "internal/control/fleet/panel/views/style.css", "ops/runtime/xray/source.tsv", "examples/nhop/topology.yaml"}
+		"internal/control/fleet/panel/views/layout.html", "internal/control/fleet/panel/views/style.css", "ops/runtime/xray/source.tsv",
+		"examples/nhop/topology.yaml", "examples/nhop/protocols.yaml"}
 	for _, name := range files {
 		write(t, filepath.Join(f.root, name), "tracked "+name+"\n", 0600)
 	}

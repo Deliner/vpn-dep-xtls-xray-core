@@ -37,6 +37,21 @@ func TestApplyRetainsVersionsAndReloadsIdempotentPublication(t *testing.T) {
 	}
 }
 
+func TestPublishedUnitNamesPermanentExecutableIndependentlyOfStoreRoot(t *testing.T) {
+	f := newFixture(t)
+	installed := f.apply(t, "executable")
+	_, unit, err := f.tx.store.revision(installed.Generation)
+	require(t, err)
+	executable := filepath.Join(service.Directory, "releases", installed.Generation, "nhop-fleet")
+	if !strings.Contains(string(unit), "ExecStart=:\""+executable+"\"") || strings.Contains(string(unit), f.root) {
+		t.Fatalf("unit must reference the permanent published executable: %s", unit)
+	}
+	require(t, service.PermanentPath(executable))
+	if _, err := service.Unit("/tmp/transient/nhop-fleet", "/var/lib/fleet-node", time.Second); err == nil {
+		t.Fatal("temporary executable remains forbidden for a real service")
+	}
+}
+
 func TestReloadFailureRestoresPreviousUnitDespiteCallerCancellation(t *testing.T) {
 	f := newFixture(t)
 	previous := f.apply(t, "old")
