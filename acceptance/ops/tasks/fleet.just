@@ -1,3 +1,8 @@
+# Check concurrent HTTPS enrollment, signed assignments, reports and persistence using synthetic Fleet nodes only.
+[group('fleet')]
+fleet-scale-test nodes='1000' workers='8':
+    @NHOP_FLEET_SCALE_NODES="$1" NHOP_FLEET_SCALE_WORKERS="$2" CGO_ENABLED=1 bash ops/quality/check.sh static-analysis go test -race -count=1 -v -timeout=10m ./internal/control/fleet/acceptance/scale -run '^TestFleetHTTPSScale$'
+
 # Create a private Fleet signing authority and administrator credential; never overwrite existing state.
 [group('fleet')]
 fleet-init state fleet:

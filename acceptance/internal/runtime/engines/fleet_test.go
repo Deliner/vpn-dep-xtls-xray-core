@@ -32,10 +32,10 @@ func BenchmarkCompileFleet(b *testing.B) {
 
 func TestNodeGenerationCompatibility(t *testing.T) {
 	// Runtime archive identity is part of the canonical generation, including on
-	// relays. These snapshots include the published maintained Xray Linux assets.
+	// relays. These snapshots include the published maintained Xray masque-sack-1 assets.
 	want := map[bool][]string{
-		false: {"d1d7b9377caa7a928f0780c12950b200df3adad4afeccc073038f52d7832ad83", "366baf966884bc59ae50a8c1d5c23254d7fe3504ca42783506c428e7995fa888", "3355ffeaa5a1210643d028a3e2c841569c1b818868b9c5cac05c980384f9a399"},
-		true:  {"13e9fe3a75a05131caded51fc559dd5d96e0ba8fac7496a27b5bab3a02d6db9e", "0d281d9b09758f7a2f0d18308fa37f15addb5087932c0fb2cc3c4a716afd5d7a", "0b47d8a97dcb4bcc86ae1c289a4b91eeae44691fff0a5d762e9cbc8223446a40"},
+		false: {"c7b3a8a389b19078192f5dd58cd34338e8bb847d5b5486f817b98720ed9907ee", "c2f814ca4af1ab740b68372e0b1ff074b2a89e435f7d50874e8bccec83e62737", "a9e72191bef78f5c2932d64c7895c13e7e61f3ce2b3852f011258c887065cb69"},
+		true:  {"53a3622c6aca9133c92ed11a584381b1c2b1666e2cdec1b8678c04135ad4aaca", "4c79b46962d0510c719af15ccb26a14ba3408fe4c476b32e34f477e33d387378", "59978c0e0468c6009e89fec2375907511195dd2f2d7378d3c4eabb7cf8314d93"},
 	}
 	for _, mixed := range []bool{false, true} {
 		top, state := fleetFixture(3, mixed)

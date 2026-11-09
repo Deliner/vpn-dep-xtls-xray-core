@@ -1,20 +1,20 @@
 {
   "version": "26.10.31",
-  "label": "nhop-fork-masque-fair-1",
-  "source_url": "https://codeload.github.com/Deliner/vpn-dep-xtls-xray-core/tar.gz/e257d40c752c32e5e7fba9c9a458538ff3dc26e3",
-  "source_sha256": "c43e4e8ff322a16d3a8e31452d41f1d52332a0cd591300ef8ef3649cd132e169",
-  "run_url": "https://github.com/Deliner/vpn-dep-xtls-xray-core/actions/runs/42528677860",
-  "workflow_sha": "071105d439d990311e539dc6866ba3fd02f1eefe",
+  "label": "nhop-fork-masque-sack-1",
+  "source_url": "https://codeload.github.com/Deliner/vpn-dep-xtls-xray-core/tar.gz/a8c797984816cfa685155897131684bc22478881",
+  "source_sha256": "d6924980d3eebf92905e91f1a774b56e98b5ca4111e804fc59d2dc327180b6b9",
+  "run_url": "https://github.com/Deliner/vpn-dep-xtls-xray-core/actions/runs/42561356135",
+  "workflow_sha": "adaf4fe1ba2858e7f5c7f2ecac8f33cc0d63a9f1",
   "targets": {
     "amd64": {
-      "binary_sha256": "12676d4e69482c6d3893b5d45f543c86065cdb45282894e429e5874101b7788c",
-      "inventory_sha256": "0623c5c110d5031e783916bcd104bbe57542b5f34bac9ea33d0a592367f11fba",
-      "evidence_sha256": "0fc442989dc9d00d1a6a6a4d027d935e0bd5adfc5eff116452ed50112fa57c53"
+      "binary_sha256": "09771aa7dbbd581f03d4f3e75a27d97702a6726f34ed680f52acc980c447e543",
+      "inventory_sha256": "e101846fbcb3d974547fb4aeebc6094773881ee0501c23fb19f25d07a7c77058",
+      "evidence_sha256": "e7fd7ac2a527cb201f34eef48ae543951c18d45e7350967d3a888294662b8a43"
     },
     "arm64": {
-      "binary_sha256": "3f6ef30182f62239d9f978beb69c337db11351b3772459e2310fc88b6261abb4",
-      "inventory_sha256": "8c822c6da7f87da015d95da0574ee4b7798d5dcaf994911fc3d0826f7e6b075c",
-      "evidence_sha256": "fb43ed9d4e21af9c0798b77342c722e8aebc9bb222d7525365a880229885fce5"
+      "binary_sha256": "8bbc59ddf013d818103fd51c8050f3674fc52c6dd5bdbdf4ab80052c5527ade3",
+      "inventory_sha256": "db31286707e7c4ee580f5081e07c5c1c52937b81581902f3ee9da2c0b4c0d16d",
+      "evidence_sha256": "af0dd96f8f48855aec360b4d9bfd72ec3c11e2dd208d84e2780e49a4d96354ff"
     }
   }
 }
