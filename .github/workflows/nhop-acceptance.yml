@@ -40,5 +40,7 @@ jobs:
         with:
           name: masque-linux-${{ matrix.arch }}
           path: acceptance/build/masque-acceptance
+          # The complete candidate source inventory includes .github and .gitignore.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30

@@ -39,6 +39,11 @@ candidate_inventory "$candidate" > "$report/runtime-after.sha256"
 cmp "$report/runtime-observed.sha256" "$report/runtime-after.sha256"
 printf 'collected\n' > "$report/status"
 masque_evidence_inventory
-just acceptance-masque-verify "$report" "$arch" "$GITHUB_SHA" "$root" > "$root/build/masque-verification.log" 2>&1
+verification_result=0
+just acceptance-masque-verify "$report" "$arch" "$GITHUB_SHA" "$root" > "$root/build/masque-verification.log" 2>&1 || verification_result=$?
 cp "$root/build/masque-verification.log" "$report/verification.log"
+if ((verification_result != 0)); then
+  cat "$report/verification.log" >&2
+  exit "$verification_result"
+fi
 printf 'passed\n' > "$report/status"
