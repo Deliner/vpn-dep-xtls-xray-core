@@ -7,7 +7,7 @@ import (
 
 func TestNHOPPacketTraceHasIdentityAndNoPayload(t *testing.T) {
 	packet := nhopTestPacket(4)
-	line, ok := nhopTCPObservation("submit", &packet, packet)
+	line, ok := nhopPacketObservation("submit", &packet, packet)
 	if !ok {
 		t.Fatal("valid packet has no observation")
 	}
@@ -19,10 +19,29 @@ func TestNHOPPacketTraceHasIdentityAndNoPayload(t *testing.T) {
 	if strings.Contains(line, "private") || strings.Contains(line, "70726976617465") || strings.ContainsAny(line, "\n\r") {
 		t.Fatal("trace disclosed payload or lost line framing")
 	}
-	if _, ok := nhopTCPObservation("deliver", &packet, nil); ok {
+	if _, ok := nhopPacketObservation("deliver", &packet, nil); ok {
 		t.Fatal("invalid packet generated an observation")
 	}
-	nhopTraceTCP("submit", &packet, packet)
+	nhopTracePacket("submit", &packet, packet)
+}
+
+func TestNHOPUDPTraceHasIdentityWithoutPayload(t *testing.T) {
+	for _, version := range []int{4, 6} {
+		packet := nhopTestDatagram(version)
+		inner, ok := nhopPacketObservation("submit", &packet, packet)
+		device, found := nhopDeviceObservation("offer", &packet, &packet, packet, 27)
+		header, valid := nhopUDPHeader(packet)
+		if !ok || !found || !valid || !strings.HasPrefix(inner, "NHOP_INNER_UDP ") || !strings.HasPrefix(device, "NHOP_DEVICE_UDP ") {
+			t.Fatal("UDP packet has no distinct boundary observation")
+		}
+		for _, line := range []string{inner, device} {
+			if !strings.HasSuffix(line, header) || strings.Contains(line, "private") || strings.Contains(line, "70726976617465") || strings.ContainsAny(line, "\r\n") {
+				t.Fatal("UDP trace lost identity, disclosed payload or lost framing")
+			}
+		}
+		nhopTracePacket("submit", &packet, packet)
+		nhopTraceDevice("offer", &packet, &packet, packet, 27)
+	}
 }
 
 func TestNHOPDeviceTraceHasQueueAndPacketIdentity(t *testing.T) {

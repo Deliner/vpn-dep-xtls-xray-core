@@ -19,6 +19,9 @@ func main() {
 }
 
 func run(args []string) error {
+	if len(args) != 0 && args[0] == "masque-netem" {
+		return checkNetem(args[1:])
+	}
 	if len(args) < 3 || len(args) > 5 {
 		return fmt.Errorf("use just payload-report DIRECTORY HOPS SINCE_UNIX_SECONDS [PLATFORM] [NODE_ADDRESSES]")
 	}

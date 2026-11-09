@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"vpn-script/internal/quality/runtimebuild/masqueprobe/overlay"
 )
 
 const sendFixture = `package quic
@@ -140,7 +142,7 @@ func TestAdaptiveControlUsesAnExplicitRecoveryOwner(t *testing.T) {
 			t.Fatalf("control lost explicit recovery ownership: %s", invariant)
 		}
 	}
-	if sendQueuePolicy([]sourceChange{{SourceSHA: sendQueueAdaptiveSource}}) != "adaptive-pmtu" {
+	if sendQueuePolicy([]overlay.Change{{SourceSHA: sendQueueAdaptiveSource}}) != "adaptive-pmtu" {
 		t.Fatal("diagnostic manifest lost adaptive send policy")
 	}
 }

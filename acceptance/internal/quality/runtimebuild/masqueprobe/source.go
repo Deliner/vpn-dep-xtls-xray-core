@@ -4,15 +4,10 @@ import (
 	"path/filepath"
 
 	"vpn-script/internal/platform/safeio"
+	"vpn-script/internal/quality/runtimebuild/masqueprobe/overlay"
 )
 
-type sourceChange struct {
-	Target    string
-	SourceSHA string
-	Modified  []byte
-}
-
-func sendQueuePolicy(changes []sourceChange) string {
+func sendQueuePolicy(changes []overlay.Change) string {
 	for _, change := range changes {
 		switch change.SourceSHA {
 		case sendQueueAdaptiveSource:
@@ -24,7 +19,7 @@ func sendQueuePolicy(changes []sourceChange) string {
 	return "legacy-nonfatal-size"
 }
 
-func connectionQueuePolicy(changes []sourceChange) string {
+func connectionQueuePolicy(changes []overlay.Change) string {
 	for _, change := range changes {
 		if change.SourceSHA == datagramBudgetSource {
 			return "per-connection-bounded"
@@ -33,7 +28,7 @@ func connectionQueuePolicy(changes []sourceChange) string {
 	return "fixed-128"
 }
 
-func inspectSources(root string) ([]sourceChange, string, error) {
+func inspectSources(root string) ([]overlay.Change, string, error) {
 	receive, policy, err := inspectReceiveSources(root)
 	if err != nil {
 		return nil, "", err
@@ -45,7 +40,7 @@ func inspectSources(root string) ([]sourceChange, string, error) {
 	return append(receive, send...), policy, nil
 }
 
-func inspectReceiveSources(root string) ([]sourceChange, string, error) {
+func inspectReceiveSources(root string) ([]overlay.Change, string, error) {
 	receivePath := filepath.Join(root, "http3", "state_tracking_stream.go")
 	receive, err := safeio.Read(receivePath, 1024*1024)
 	if err != nil {
@@ -69,14 +64,14 @@ func inspectReceiveSources(root string) ([]sourceChange, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	return []sourceChange{
+	return []overlay.Change{
 		{Target: receivePath, SourceSHA: receiveSHA, Modified: receive},
 		{Target: datagramPath, SourceSHA: datagramSHA, Modified: datagram},
 		{Target: controlPath, Modified: control},
 	}, policy, nil
 }
 
-func inspectSendSources(root string) ([]sourceChange, error) {
+func inspectSendSources(root string) ([]overlay.Change, error) {
 	sendPath := filepath.Join(root, "send_queue.go")
 	send, sendSHA, err := instrumentVerifiedSend(sendPath)
 	if err != nil {
@@ -87,7 +82,7 @@ func inspectSendSources(root string) ([]sourceChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []sourceChange{
+	return []overlay.Change{
 		{Target: sendPath, SourceSHA: sendSHA, Modified: send},
 		{Target: controlPath, Modified: control},
 	}, nil

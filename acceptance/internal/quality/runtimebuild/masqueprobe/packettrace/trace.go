@@ -6,19 +6,19 @@ import (
 	"time"
 )
 
-func nhopTraceTCP(direction string, connection any, packet []byte) {
-	line, ok := nhopTCPObservation(direction, connection, packet)
+func nhopTracePacket(direction string, connection any, packet []byte) {
+	line, ok := nhopPacketObservation(direction, connection, packet)
 	if ok {
 		fmt.Fprintln(os.Stderr, line)
 	}
 }
 
-func nhopTCPObservation(direction string, connection any, packet []byte) (string, bool) {
-	header, ok := nhopTCPHeader(packet)
-	if !ok {
+func nhopPacketObservation(direction string, connection any, packet []byte) (string, bool) {
+	network, header := nhopPacketHeader(packet)
+	if network == "" {
 		return "", false
 	}
-	return fmt.Sprintf("NHOP_INNER_TCP unix_ns=%d pid=%d conn=%p phase=%s %s", time.Now().UnixNano(), os.Getpid(), connection, direction, header), true
+	return fmt.Sprintf("NHOP_INNER_%s unix_ns=%d pid=%d conn=%p phase=%s %s", network, time.Now().UnixNano(), os.Getpid(), connection, direction, header), true
 }
 
 func nhopTraceDevice(direction string, device, packet any, data []byte, queued int) {
@@ -29,9 +29,19 @@ func nhopTraceDevice(direction string, device, packet any, data []byte, queued i
 }
 
 func nhopDeviceObservation(direction string, device, packet any, data []byte, queued int) (string, bool) {
-	header, ok := nhopTCPHeader(data)
-	if !ok {
+	network, header := nhopPacketHeader(data)
+	if network == "" {
 		return "", false
 	}
-	return fmt.Sprintf("NHOP_DEVICE_TCP unix_ns=%d pid=%d device=%p packet=%p phase=%s queued=%d %s", time.Now().UnixNano(), os.Getpid(), device, packet, direction, queued, header), true
+	return fmt.Sprintf("NHOP_DEVICE_%s unix_ns=%d pid=%d device=%p packet=%p phase=%s queued=%d %s", network, time.Now().UnixNano(), os.Getpid(), device, packet, direction, queued, header), true
+}
+
+func nhopPacketHeader(packet []byte) (string, string) {
+	if header, ok := nhopTCPHeader(packet); ok {
+		return "TCP", header
+	}
+	if header, ok := nhopUDPHeader(packet); ok {
+		return "UDP", header
+	}
+	return "", ""
 }

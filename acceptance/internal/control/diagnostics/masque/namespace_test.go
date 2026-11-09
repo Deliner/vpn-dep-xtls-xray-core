@@ -4,19 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"strconv"
 	"testing"
 	"time"
 
+	"vpn-script/internal/control/integration/evidence/installation"
 	"vpn-script/internal/platform/process"
 )
 
 func requireIsolation(t *testing.T) {
 	t.Helper()
-	host, err := os.Hostname()
-	if runtime.GOOS != "linux" || os.Geteuid() != 0 || err != nil || host != "lima-payload" || os.Getenv("NHOP_MASQUE_NETEM_TEST") != "private-netns" {
-		t.Fatal("MASQUE faults require the owned Linux VM and private namespaces")
+	if err := installation.OwnedHost(); err != nil || os.Getenv("NHOP_MASQUE_NETEM_TEST") != "private-netns" {
+		t.Fatalf("MASQUE faults require an owned Linux test host and private namespaces: %v", err)
 	}
 	for _, name := range []string{"net", "mnt", "pid"} {
 		actual, err := os.Readlink("/proc/self/ns/" + name)

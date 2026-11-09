@@ -58,10 +58,10 @@ lab-routing run xray singbox:
 lab-masque xray singbox probe repeats='20' debug='0':
     bash ops/testing/diagnostics/masque.sh "$1" "$2" "$3" "$4" "$5"
 
-# Exercise MASQUE H3 under netem loss/delay/MTU, burst load and restarts in private PID/network namespaces.
+# Exercise a verified Xray candidate or probe under netem loss/delay/MTU, load and restarts in private namespaces.
 [group('lab')]
-lab-masque-netem probe cycles='3' workers='8' packets='32':
-    @bash ops/quality/check.sh static-analysis bash ops/testing/diagnostics/netem/lab.sh "$1" "$2" "$3" "$4"
+lab-masque-netem runtime cycles='3' workers='8' packets='32' congestion='':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/diagnostics/netem/lab.sh "$1" "$2" "$3" "$4" "$5"
 
 # Verify controller SSH/SCP, literal paths and host-key refusal against the owned VM.
 [group('lab')]

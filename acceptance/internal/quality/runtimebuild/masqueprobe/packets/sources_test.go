@@ -1,4 +1,4 @@
-package masqueprobe
+package packets
 
 import (
 	"os"
@@ -17,7 +17,7 @@ func TestPacketProbeRejectsUnreviewedSourceAndOccupiedHelpers(t *testing.T) {
 	if err := os.WriteFile(path, original, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := inspectPackets(root); err == nil {
+	if _, err := InspectConnectIP(root); err == nil {
 		t.Fatal("accepted unreviewed CONNECT-IP source")
 	}
 	actual, err := os.ReadFile(path)
@@ -44,7 +44,7 @@ func TestDeviceProbeRejectsUnreviewedSource(t *testing.T) {
 	if err := os.WriteFile(path, original, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := inspectDevice(root); err == nil {
+	if _, err := InspectDevice(root); err == nil {
 		t.Fatal("accepted unreviewed device source")
 	}
 	actual, err := os.ReadFile(path)

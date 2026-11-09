@@ -23,6 +23,7 @@ mkdir "$run/experiment" "$run/experiment/probe"
 cp "$run/package/payload.tar.gz" "$run/experiment/"
 cp "$probe/bin/xray" "$run/experiment/probe/xray"
 cp "$probe/provenance.txt" "$probe/control.log" "$run/experiment/probe/"
+if [[ -f "$probe/server-control.log" ]]; then cp "$probe/server-control.log" "$run/experiment/probe/"; fi
 cp "$lab_root/ops/testing/diagnostics/masque-guest.sh" "$run/experiment/guest.sh"
 printf '%s\n' "$repeats" > "$run/experiment/repeats"
 printf '%s\n' "$5" > "$run/experiment/debug-level"

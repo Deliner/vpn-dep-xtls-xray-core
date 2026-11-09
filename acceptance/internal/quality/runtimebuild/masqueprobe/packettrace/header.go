@@ -9,7 +9,7 @@ import (
 // Only complete, unfragmented IPv4 or base-header IPv6 TCP is observed. Other
 // packets still follow the original engine path, without diagnostic output.
 func nhopTCPHeader(packet []byte) (string, bool) {
-	src, dst, segment := nhopTCPSegment(packet)
+	src, dst, segment := nhopIPSegment(packet, 6)
 	if len(segment) < 20 {
 		return "", false
 	}
@@ -22,13 +22,13 @@ func nhopTCPHeader(packet []byte) (string, bool) {
 	return fmt.Sprintf("src=%s dst=%s tcp=%x payload=%d", source, destination, segment[:header], len(segment)-header), true
 }
 
-func nhopTCPSegment(packet []byte) (src, dst netip.Addr, segment []byte) {
+func nhopIPSegment(packet []byte, protocol byte) (src, dst netip.Addr, segment []byte) {
 	if len(packet) == 0 {
 		return
 	}
 	switch packet[0] >> 4 {
 	case 4:
-		if len(packet) < 20 || packet[9] != 6 || binary.BigEndian.Uint16(packet[6:8])&0x3fff != 0 {
+		if len(packet) < 20 || packet[9] != protocol || binary.BigEndian.Uint16(packet[6:8])&0x3fff != 0 {
 			return
 		}
 		header, total := int(packet[0]&15)*4, int(binary.BigEndian.Uint16(packet[2:4]))
@@ -38,7 +38,7 @@ func nhopTCPSegment(packet []byte) (src, dst netip.Addr, segment []byte) {
 		src, dst = netip.AddrFrom4([4]byte(packet[12:16])), netip.AddrFrom4([4]byte(packet[16:20]))
 		return src, dst, packet[header:total]
 	case 6:
-		if len(packet) < 40 || packet[6] != 6 {
+		if len(packet) < 40 || packet[6] != protocol {
 			return
 		}
 		total := 40 + int(binary.BigEndian.Uint16(packet[4:6]))

@@ -1,4 +1,4 @@
-package masqueprobe
+package packets
 
 import (
 	"bytes"
@@ -8,12 +8,13 @@ import (
 	"path/filepath"
 
 	"vpn-script/internal/platform/safeio"
+	"vpn-script/internal/quality/runtimebuild/masqueprobe/overlay"
 )
 
 const deviceSource = "7699af76176f60324873476fb62ff652604ed09182336a21762cfe61b308e2ba"
 const fairDeviceSource = "9f19cf67815913851930cf29f4a32ef696232260b13909bdef33693912836ff2"
 
-func inspectDevice(source string) ([]sourceChange, error) {
+func InspectDevice(source string) ([]overlay.Change, error) {
 	root, err := filepath.Abs(source)
 	if err != nil {
 		return nil, err
@@ -37,7 +38,7 @@ func inspectDevice(source string) ([]sourceChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append([]sourceChange{{Target: path, SourceSHA: digest, Modified: modified}}, helpers...), nil
+	return append([]overlay.Change{{Target: path, SourceSHA: digest, Modified: modified}}, helpers...), nil
 }
 
 func instrumentDevice(source []byte, fair bool) ([]byte, error) {

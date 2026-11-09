@@ -101,6 +101,9 @@ for phase in submit queued deliver; do
     printf 'Diagnostic control did not observe inner TCP phase %s.\n' "$phase" >&2
     exit 1
   }
+  for source in '192\.0\.2\.1:' '\[fd00::1\]:'; do
+    grep -Eq "NHOP_INNER_UDP .*phase=$phase .*src=$source.*payload=52 digest=[a-f0-9]{64}$" "$output/packet-control.log"
+  done
 done
 if ! CGO_ENABLED=1 go -C "$base/source" test -race -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
   ./proxy/wireguard -run '^(TestNHOP|TestNetTUN)' -count=1 -v > "$output/device-control.log" 2>&1; then
@@ -113,10 +116,34 @@ for boundary in 'offer queued=0' 'read queued=1'; do
     exit 1
   }
 done
+for phase in offer read; do
+  for source in '192\.0\.2\.1:' '\[fd00::1\]:'; do
+    grep -Eq "NHOP_DEVICE_UDP .*phase=$phase queued=0 .*src=$source.*payload=52 digest=[a-f0-9]{64}$" "$output/device-control.log"
+  done
+done
+if ! CGO_ENABLED=1 go -C "$base/source" test -race -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
+  ./proxy/masque -count=1 -v > "$output/server-control.log" 2>&1; then
+  cat "$output/server-control.log" >&2
+  exit 1
+fi
+grep -q '^NHOP_SERVER_QUEUE_POLICY limit=512 full=reject closed=reject fifo=true ownership=true$' "$output/server-control.log"
+for phase in offer admitted dequeue write_done; do
+  grep -Eq "NHOP_SERVER_QUEUE .*phase=$phase .*limit=512 .*network=tcp " "$output/server-control.log"
+done
+for phase in drop_full drop_closed; do
+  grep -Eq "NHOP_SERVER_QUEUE .*phase=$phase queued=512 limit=512 .*network=udp .*digest=[a-f0-9]{64}$" "$output/server-control.log"
+done
+for failed in true false; do
+  grep -Eq "NHOP_SERVER_QUEUE .*phase=write_done .*limit=512 failed=$failed .*network=udp .*digest=[a-f0-9]{64}$" "$output/server-control.log"
+done
+for kind in none packet-too-big closed canceled timeout other; do
+  grep -Eq "NHOP_SERVER_QUEUE .*phase=write_done .*write_error=$kind .*network=udp " "$output/server-control.log"
+done
+grep -q '^--- PASS: TestNHOPServerQueueBindingPacketTooBig ' "$output/server-control.log"
 mkdir "$output/bin"
 GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 go -C "$base/source" build \
   -trimpath -buildvcs=false -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
-  -ldflags '-s -w -buildid= -X github.com/xtls/xray-core/core.build=nhop-diagnostic-masque-7' \
+  -ldflags '-s -w -buildid= -X github.com/xtls/xray-core/core.build=nhop-diagnostic-masque-9' \
   -o "$output/bin/xray" ./main
 go -C "$base/source" mod verify
 candidate_inventory "$base" > "$output/input.after.sha256"
@@ -124,12 +151,13 @@ cmp "$output/input.before.sha256" "$output/input.after.sha256"
 (cd "$output/dependency"; find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) > "$output/dependency.after.sha256"
 cmp "$output/dependency.before.sha256" "$output/dependency.after.sha256"
 {
-  printf 'kind=diagnostic-only\nprobe_label=nhop-diagnostic-masque-7\nbase_candidate=%s\ntarget=%s\n' "$base" "$target"
+  printf 'kind=diagnostic-only\nprobe_label=nhop-diagnostic-masque-9\nbase_candidate=%s\ntarget=%s\n' "$base" "$target"
   cat "$base/provenance.txt"
   go version -m "$output/bin/xray"
   shasum -a 256 "$root/ops/runtime/masque-probe.sh" "$root/cmd/masqueprobe/main.go" "$root"/internal/quality/runtimebuild/masqueprobe/*.go
+  shasum -a 256 "$root"/internal/quality/runtimebuild/masqueprobe/overlay/*.go "$root"/internal/quality/runtimebuild/masqueprobe/packets/*.go
   shasum -a 256 "$root"/internal/quality/runtimebuild/masqueprobe/packettrace/*.go
 } > "$output/provenance.txt"
-(cd "$output"; shasum -a 256 bin/xray overlay/* overlay.json probe.json probe.mod probe.sum provenance.txt control.log receive-control.log send-control.log packet-control.log device-control.log input.*.sha256 dependency.*.sha256) > "$output/SHA256SUMS"
+(cd "$output"; shasum -a 256 bin/xray overlay/* overlay.json probe.json probe.mod probe.sum provenance.txt control.log receive-control.log send-control.log packet-control.log device-control.log server-control.log input.*.sha256 dependency.*.sha256) > "$output/SHA256SUMS"
 printf 'diagnostic-built\n' > "$output/status"
-printf 'Diagnostic only, logs dropped prefixes and inner TCP headers: %s/bin/xray\nUse only with synthetic lab traffic.\n' "$output"
+printf 'Diagnostic only, logs queues, TCP headers and UDP digests: %s/bin/xray\nUse only with synthetic lab traffic.\n' "$output"

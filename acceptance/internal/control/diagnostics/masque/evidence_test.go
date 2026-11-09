@@ -20,8 +20,26 @@ func writeJSON(t *testing.T, path string, value any) {
 
 func attributeQueueDrops(t *testing.T, directory string) {
 	t.Helper()
+	switch kind := os.Getenv("NHOP_MASQUE_RUNTIME_KIND"); kind {
+	case "runtime-candidate":
+		writeJSON(t, filepath.Join(directory, "queue-attribution.json"), map[string]any{
+			"available": false, "reason": "runtime-candidate has no diagnostic queue observer",
+		})
+		t.Log("HTTP/3 queue observations unavailable for ordinary runtime candidate")
+		return
+	case "diagnostic-probe":
+	default:
+		t.Fatalf("unknown queue observation source: %q", kind)
+	}
+	report := correlateQueueEvidence(t, directory)
+	writeJSON(t, filepath.Join(directory, "queue-attribution.json"), report)
+	t.Logf("HTTP/3 queue drops: total=%d UDP=%d TCP=%d; packet/time attribution saved", report.Total, report.UDP, report.TCP)
+}
+
+func correlateQueueEvidence(t *testing.T, directory string) queueEvidence {
+	t.Helper()
 	events := readQueueDrops(t, directory)
-	report := queueEvidence{Total: len(events)}
+	report := queueEvidence{Available: true, Total: len(events)}
 	byID := map[packetID][]int64{}
 	for _, event := range events {
 		if event.Protocol == 17 {
@@ -44,8 +62,33 @@ func attributeQueueDrops(t *testing.T, directory string) {
 		}
 		report.Phases = append(report.Phases, correlatePhase(phase, byID))
 	}
-	writeJSON(t, filepath.Join(directory, "queue-attribution.json"), report)
-	t.Logf("HTTP/3 queue drops: total=%d UDP=%d TCP=%d; packet/time attribution saved", report.Total, report.UDP, report.TCP)
+	return report
+}
+
+func TestQueueAttributionDistinguishesUnavailableFromMeasuredZero(t *testing.T) {
+	for _, kind := range []string{"runtime-candidate", "diagnostic-probe"} {
+		t.Run(kind, func(t *testing.T) {
+			t.Setenv("NHOP_MASQUE_RUNTIME_KIND", kind)
+			directory := t.TempDir()
+			attributeQueueDrops(t, directory)
+			var result map[string]any
+			if err := json.Unmarshal(readEvidence(t, filepath.Join(directory, "queue-attribution.json")), &result); err != nil {
+				t.Fatal(err)
+			}
+			available := kind == "diagnostic-probe"
+			if result["available"] != available {
+				t.Fatal("queue observation availability changed")
+			}
+			for _, field := range []string{"queue_events", "udp_events", "tcp_events", "phases"} {
+				if _, present := result[field]; present != available {
+					t.Fatalf("queue field %s invented or omitted for %s", field, kind)
+				}
+			}
+			if available && result["queue_events"] != float64(0) {
+				t.Fatal("an empty observed queue report has nonzero events")
+			}
+		})
+	}
 }
 
 func readQueueDrops(t *testing.T, directory string) []queueDrop {

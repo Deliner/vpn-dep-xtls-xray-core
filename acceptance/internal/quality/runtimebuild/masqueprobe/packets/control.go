@@ -1,4 +1,4 @@
-package masqueprobe
+package packets
 
 import "strings"
 
@@ -9,6 +9,7 @@ func packetControl(capsules bool) string {
 	return strings.NewReplacer(
 		"closeChan: make(chan struct{}), localRoutes:", "h3Receiver: newDatagramReceiver(stream), closeChan: make(chan struct{}), localRoutes:",
 		"packet := nhopTestPacket(4)", "defer conn.h3Receiver.stop()\n\tpacket := nhopTestPacket(4)",
+		"packet := nhopTestDatagram(version)", "defer conn.h3Receiver.stop()\n\tpacket := nhopTestDatagram(version)",
 	).Replace(packetBindingControl) + packetCapsuleControl
 }
 
@@ -82,6 +83,39 @@ func TestNHOPPacketBindingPreservesSendFailure(t *testing.T) {
 		t.Fatalf("closed read behavior changed: %v", err)
 	}
 }
+
+func TestNHOPPacketBindingPreservesUDP(t *testing.T) {
+	for _, version := range []int{4, 6} {
+		datagrams := make(chan []byte, 1)
+		stream := &mockStream{datagrams: datagrams}
+		conn := &Conn{h3: stream, closeChan: make(chan struct{}), localRoutes: []IPRoute{
+			{StartIP: netip.IPv4Unspecified(), EndIP: netip.MustParseAddr("255.255.255.255")},
+			{StartIP: netip.IPv6Unspecified(), EndIP: netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")},
+		}}
+		packet := nhopTestDatagram(version)
+		original := bytes.Clone(packet)
+		icmp, err := conn.WritePacket(packet)
+		if err != nil || len(icmp) != 0 || len(stream.sent) != 1 {
+			t.Fatalf("IPv%d UDP write changed: icmp=%x err=%v", version, icmp, err)
+		}
+		// Forwarding owns TTL/Hop Limit and IPv4 checksum updates.
+		if version == 4 {
+			original[8]--
+			copy(original[10:12], packet[10:12])
+		} else {
+			original[7]--
+		}
+		if !bytes.Equal(packet, original) || !bytes.Equal(stream.sent[0], append([]byte{0}, original...)) {
+			t.Fatal("UDP observer changed forwarding, payload or context ID")
+		}
+		datagrams <- stream.sent[0]
+		buffer := make([]byte, len(packet))
+		n, err := conn.ReadPacket(buffer)
+		if err != nil || n != len(packet) || !bytes.Equal(buffer, original) {
+			t.Fatalf("IPv%d UDP read changed: size=%d err=%v", version, n, err)
+		}
+	}
+}
 `
 
 const packetCapsuleControl = `
@@ -147,6 +181,27 @@ func TestNHOPDeviceBindingPreservesClosedState(t *testing.T) {
 	}
 	if n, err := device.Read([][]byte{make([]byte, 1500)}, []int{0}, 0); n != 0 || !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("closed read behavior changed: n=%d err=%v", n, err)
+	}
+}
+
+func TestNHOPDeviceBindingPreservesUDP(t *testing.T) {
+	for _, version := range []int{4, 6} {
+		device := &netTun{packets: make(chan *buf.Buffer, netTunQueue), closed: make(chan struct{})}
+		packet := nhopTestDatagram(version)
+		original := bytes.Clone(packet)
+		header := 20
+		if version == 6 {
+			header = 40
+		}
+		if err := device.WritePacket(packet[:header], packet[header:]); err != nil {
+			t.Fatal(err)
+		}
+		clear(packet)
+		buffer, sizes := make([]byte, len(original)+3), []int{0}
+		n, err := device.Read([][]byte{buffer}, sizes, 3)
+		if err != nil || n != 1 || sizes[0] != len(original) || !bytes.Equal(buffer[3:], original) {
+			t.Fatalf("IPv%d UDP device copy changed: n=%d size=%d err=%v", version, n, sizes[0], err)
+		}
 	}
 }
 `

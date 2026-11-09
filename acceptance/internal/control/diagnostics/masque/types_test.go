@@ -94,10 +94,11 @@ type queueDrop struct {
 }
 
 type queueEvidence struct {
-	Total  int                `json:"queue_events"`
-	UDP    int                `json:"udp_events"`
-	TCP    int                `json:"tcp_events"`
-	Phases []phaseAttribution `json:"phases"`
+	Available bool               `json:"available"`
+	Total     int                `json:"queue_events"`
+	UDP       int                `json:"udp_events"`
+	TCP       int                `json:"tcp_events"`
+	Phases    []phaseAttribution `json:"phases"`
 }
 
 type phaseAttribution struct {

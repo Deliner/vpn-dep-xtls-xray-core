@@ -4,29 +4,23 @@ umask 077
 source "$(dirname "${BASH_SOURCE[0]}")/../../linux/environment.sh"
 lab_environment
 lab_owned
-[[ $# == 4 ]] || exit 2
-probe="$(cd "$1" && pwd -P)"
-case "$probe/" in "$lab_root/build/runtime-probes/"*) ;; *) exit 2 ;; esac
-[[ "$(cat "$probe/status")" == diagnostic-built ]] || exit 2
-[[ "$(sed -n 's/^target=//p' "$probe/provenance.txt" | head -1)" == "linux/$lab_arch" ]] || exit 2
+[[ $# == 5 ]] || exit 2
+case "$5" in ''|bbr|reno) ;; *) printf 'Diagnostic congestion must be empty, bbr or reno.\n' >&2; exit 2 ;; esac
+source "$lab_root/ops/testing/diagnostics/netem/runtime.sh"
 mkdir -p "$lab_data/runs"
 run="$(mktemp -d "$lab_data/runs/masque-netem-XXXXXXXX")"
 printf 'preparing\n' > "$run/status"
 trap 'result=$?; if ((result != 0)); then printf "failed\n" > "$run/status"; fi' EXIT
-(cd "$probe"; shasum -a 256 --check SHA256SUMS) > "$run/probe-integrity.log"
-mkdir "$run/experiment" "$run/experiment/bin"
+mkdir "$run/experiment"
+netem_prepare_runtime "$lab_root" "$1" "$lab_arch" "$run/experiment" > "$run/runtime-integrity.log"
 GOOS=linux GOARCH="$lab_arch" CGO_ENABLED=0 go test -c -trimpath -buildvcs=false \
   -o "$run/experiment/network.test" ./internal/control/diagnostics/masque
-cp "$probe/bin/xray" "$run/experiment/bin/xray"
-cp "$probe/provenance.txt" "$probe/control.log" "$probe/probe.json" "$run/experiment/"
-if [[ -f "$probe/send-control.log" ]]; then cp "$probe/send-control.log" "$run/experiment/"; fi
-if [[ -f "$probe/packet-control.log" ]]; then cp "$probe/packet-control.log" "$run/experiment/"; fi
-if [[ -f "$probe/device-control.log" ]]; then cp "$probe/device-control.log" "$run/experiment/"; fi
-if [[ -f "$probe/receive-control.log" ]]; then cp "$probe/receive-control.log" "$run/experiment/"; fi
-cp ops/testing/diagnostics/netem/guest.sh ops/testing/diagnostics/netem/namespace.sh "$run/experiment/"
+cp ops/testing/diagnostics/netem/{guest,namespace,context}.sh "$run/experiment/"
+printf 'private-lima\n' > "$run/experiment/execution-context"
 printf '%s\n' "$2" > "$run/experiment/cycles"
 printf '%s\n' "$3" > "$run/experiment/workers"
 printf '%s\n' "$4" > "$run/experiment/packets"
+printf '%s\n' "$5" > "$run/experiment/congestion"
 {
   go version
   git rev-parse HEAD

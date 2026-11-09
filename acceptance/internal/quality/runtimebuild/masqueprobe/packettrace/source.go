@@ -8,12 +8,12 @@ import (
 	"fmt"
 )
 
-//go:embed header.go trace.go header_test.go trace_test.go
+//go:embed header.go trace.go header_test.go trace_test.go datagram.go datagram_test.go queue.go queue_test.go
 var sources embed.FS
 
 // Sources returns compilable helpers and controls under the target package name.
 func Sources(target string) (map[string][]byte, error) {
-	if target != "connectip" && target != "wireguard" {
+	if target != "connectip" && target != "wireguard" && target != "masque" {
 		return nil, fmt.Errorf("unreviewed diagnostic package: %s", target)
 	}
 	entries, err := sources.ReadDir(".")

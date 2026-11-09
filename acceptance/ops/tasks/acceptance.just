@@ -69,3 +69,13 @@ acceptance-installer-verify directory arch commit snapshot:
 [group('acceptance')]
 acceptance-collect directory run_id:
     @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/collect.sh "$1" "$2"
+
+# Compare ordinary Xray BBR and Reno under loss/delay/MTU/restarts only on owned native Linux CI.
+[group('acceptance')]
+acceptance-masque-run arch:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/acceptance/masque/run.sh "$1"
+
+# Verify the complete native MASQUE experiment, runtime identity, controls and Reno results.
+[group('acceptance')]
+acceptance-masque-verify directory arch commit snapshot:
+    @bash ops/quality/check.sh static-analysis go run ./cmd/payloadcheck masque-netem "$1" "$2" "$3" "$4"

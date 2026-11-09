@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-[[ "$(uname -s)" == Linux && "$(hostname)" == lima-payload && "$(id -u)" == 0 ]] || exit 2
+[[ "$(id -u)" == 0 ]] || exit 2
+source ./context.sh
+netem_execution_context
 for namespace in net mnt pid; do
   variable="NHOP_MASQUE_HOST_$namespace"
   [[ -n "${!variable:-}" && "$(readlink "/proc/self/ns/$namespace")" != "${!variable}" ]] || {
@@ -9,7 +11,6 @@ for namespace in net mnt pid; do
     exit 2
   }
 done
-[[ "$PWD" == /home/nhop/runs/masque-netem-*/experiment ]] || exit 2
 mount --make-rprivate /
 mkdir -p /run/netns
 mount -t tmpfs nhop-masque-netem /run/netns
@@ -35,10 +36,17 @@ mkdir -m 0700 reports
   date -u +%FT%TZ
   uname -a
   tc -V
-  printf 'diagnostic_only=true\nloss_seed=none\n'
+  printf 'experiment_only=true\nloss_seed=none\n'
+  printf 'congestion=%s\n' "${NHOP_MASQUE_CONGESTION:-}"
+  printf 'runtime_kind=%s\n' "$NHOP_MASQUE_RUNTIME_KIND"
+  printf 'execution_context=%s\n' "$NHOP_SYSTEMD_ACCEPTANCE"
   for namespace in net mnt pid; do readlink "/proc/self/ns/$namespace"; done
   sha256sum network.test bin/xray
 } > reports/identity.txt
+for namespace in net mnt pid; do
+  variable="NHOP_MASQUE_HOST_$namespace"
+  printf '%s=%s\nhost_%s=%s\n' "$namespace" "$(readlink "/proc/self/ns/$namespace")" "$namespace" "${!variable}"
+done > reports/isolation.txt
 capture=
 finish() {
   local result=$?
