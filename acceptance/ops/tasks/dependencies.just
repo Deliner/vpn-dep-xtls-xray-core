@@ -121,7 +121,7 @@ dependency-format directory +files:
 dependency-push repository:
     @bash ops/quality/check.sh static-analysis bash ops/dependencies/push.sh "$1"
 
-# Regenerate only the QUIC send queue mock from its pinned Go tool and maintained interface.
+# Regenerate the QUIC sender and ACK-handler mocks from their pinned tool and maintained interfaces.
 [group('dependencies')]
 dependency-quic-mocks:
     #!/usr/bin/env bash
@@ -132,3 +132,4 @@ dependency-quic-mocks:
       *) exit 2 ;;
     esac
     GOWORK=off GOFLAGS=-mod=readonly bash ops/quality/check.sh static-analysis go -C "$directory" generate -run mock_sender_test.go mockgen.go
+    GOWORK=off GOFLAGS=-mod=readonly bash ops/quality/check.sh static-analysis go -C "$directory/internal/mocks" generate -run ackhandler/sent_packet_handler.go mockgen.go

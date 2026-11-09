@@ -56,8 +56,8 @@ fi
 grep -Eq '^NHOP_QUIC_QUEUE_DROP .*queued=128 limit=128 bytes=128 prefix=(ab){96}$' "$output/receive-control.log"
 grep -Eq '^NHOP_QUIC_QUEUE_DROP .*queued=128 limit=128 bytes=1 prefix=ff$' "$output/receive-control.log"
 grep -q '^NHOP_QUIC_RECEIVE_POLICY limit=128 drops=2 fifo=true copy=true recovery=true close=true$' "$output/receive-control.log"
-if ! go -C "$base/source" test -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
-  github.com/apernet/quic-go -run '^(TestSendQueue|TestNHOPSendQueueSizeDrop)' -count=1 -v > "$output/send-control.log" 2>&1; then
+if ! CGO_ENABLED=1 go -C "$base/source" test -race -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
+  github.com/apernet/quic-go -run '^(TestSendQueue|TestNHOPSendQueueSizeDrop|TestNHOPSendQueuePMTU)' -count=1 -v > "$output/send-control.log" 2>&1; then
   cat "$output/send-control.log" >&2
   exit 1
 fi
@@ -77,6 +77,14 @@ else
       exit 1
     }
   done
+fi
+if grep -q '"send_queue_policy": "adaptive-pmtu"' "$output/probe.json"; then
+  for kernel in true false; do
+    grep -Eq "NHOP_QUIC_SEND_SIZE_DROP .*bytes=1300 gso=0 kernel=$kernel probe=false terminal=false failed_size=1300 " "$output/send-control.log"
+  done
+  grep -q '^NHOP_ADAPTIVE_SEND_POLICY size=1300 terminal=false preserved=true$' "$output/send-control.log"
+  grep -Eq 'NHOP_QUIC_SEND_SIZE_DROP .*bytes=1200 gso=0 kernel=true probe=false terminal=true failed_size=1200 ' "$output/send-control.log"
+  grep -q '^NHOP_ADAPTIVE_SEND_POLICY size=1200 terminal=true preserved=true$' "$output/send-control.log"
 fi
 if ! grep -Eq 'NHOP_H3_QUEUE_DROP .*queued=32 bytes=1 prefix=20$' "$output/control.log"; then
   printf 'Diagnostic control did not observe the expected queue drop.\n' >&2
@@ -108,7 +116,7 @@ done
 mkdir "$output/bin"
 GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 go -C "$base/source" build \
   -trimpath -buildvcs=false -modfile "$output/probe.mod" -overlay "$output/overlay.json" \
-  -ldflags '-s -w -buildid= -X github.com/xtls/xray-core/core.build=nhop-diagnostic-masque-6' \
+  -ldflags '-s -w -buildid= -X github.com/xtls/xray-core/core.build=nhop-diagnostic-masque-7' \
   -o "$output/bin/xray" ./main
 go -C "$base/source" mod verify
 candidate_inventory "$base" > "$output/input.after.sha256"
@@ -116,7 +124,7 @@ cmp "$output/input.before.sha256" "$output/input.after.sha256"
 (cd "$output/dependency"; find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) > "$output/dependency.after.sha256"
 cmp "$output/dependency.before.sha256" "$output/dependency.after.sha256"
 {
-  printf 'kind=diagnostic-only\nprobe_label=nhop-diagnostic-masque-6\nbase_candidate=%s\ntarget=%s\n' "$base" "$target"
+  printf 'kind=diagnostic-only\nprobe_label=nhop-diagnostic-masque-7\nbase_candidate=%s\ntarget=%s\n' "$base" "$target"
   cat "$base/provenance.txt"
   go version -m "$output/bin/xray"
   shasum -a 256 "$root/ops/runtime/masque-probe.sh" "$root/cmd/masqueprobe/main.go" "$root"/internal/quality/runtimebuild/masqueprobe/*.go

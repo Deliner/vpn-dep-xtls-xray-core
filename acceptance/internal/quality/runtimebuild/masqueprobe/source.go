@@ -12,6 +12,18 @@ type sourceChange struct {
 	Modified  []byte
 }
 
+func sendQueuePolicy(changes []sourceChange) string {
+	for _, change := range changes {
+		switch change.SourceSHA {
+		case sendQueueAdaptiveSource:
+			return "adaptive-pmtu"
+		case sendQueueMTUSource:
+			return "fatal-data-size"
+		}
+	}
+	return "legacy-nonfatal-size"
+}
+
 func connectionQueuePolicy(changes []sourceChange) string {
 	for _, change := range changes {
 		if change.SourceSHA == datagramBudgetSource {

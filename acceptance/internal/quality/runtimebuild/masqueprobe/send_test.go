@@ -107,3 +107,40 @@ func TestMTUProbeInstrumentationPreservesFatalDataErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestAdaptiveProbePreservesRecoveryOwnership(t *testing.T) {
+	recovery := "\tif h.reportMTUError(entry) {\n\t\treturn nil\n\t}\n"
+	fixture := strings.Replace(mtuSendFixture, "\treturn fmt.Errorf", recovery+"\treturn fmt.Errorf", 1)
+	modified, err := instrumentAdaptiveSendQueue([]byte(fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invariant := range []string{"defer entry.buf.Release()", "h.reportMTUError(entry)",
+		"if entry.mtuProbe {", "return fmt.Errorf(\"non-probe packet: %w\", err)", "NHOP_QUIC_SEND_SIZE_DROP",
+		"size = min(size, protocol.ByteCount(entry.gsoSize))", "size <= protocol.MinInitialPacketSize || h.mtuErrors == nil"} {
+		if bytes.Count(modified, []byte(invariant)) != 1 {
+			t.Fatalf("diagnostic changed recovery or minimum size policy: %s", invariant)
+		}
+	}
+	for _, input := range [][]byte{modified, []byte(mtuSendFixture), []byte(strings.ReplaceAll(fixture, "entry.mtuProbe", "true"))} {
+		if _, err := instrumentAdaptiveSendQueue(input); err == nil {
+			t.Fatal("accepted ambiguous adaptive MTU policy")
+		}
+	}
+}
+
+func TestAdaptiveControlUsesAnExplicitRecoveryOwner(t *testing.T) {
+	control, err := prepareSendControl(filepath.Join(t.TempDir(), "control.go"), sendQueueAdaptiveSource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invariant := range []string{"newSendQueue(connection, nil)", "newSendQueue(connection, feedback)",
+		"TestNHOPSendQueuePMTUFeedback", "TestNHOPSendQueuePMTUMinimum", "NHOP_ADAPTIVE_SEND_POLICY"} {
+		if bytes.Count(control, []byte(invariant)) != 1 {
+			t.Fatalf("control lost explicit recovery ownership: %s", invariant)
+		}
+	}
+	if sendQueuePolicy([]sourceChange{{SourceSHA: sendQueueAdaptiveSource}}) != "adaptive-pmtu" {
+		t.Fatal("diagnostic manifest lost adaptive send policy")
+	}
+}

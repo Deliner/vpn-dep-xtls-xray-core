@@ -67,6 +67,15 @@ for arch in amd64 arm64; do
     done
   fi
   (cd "$report"; shasum -a 256 --check evidence.sha256) > "$report/integrity-verification.log"
+  if grep -Fq 'xray-congestion-regressions.log' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
+    grep -Fq -- '--- PASS: TestNHOPBBRPathMTUDecrease (' "$report/xray-congestion-regressions.log" || exit 1
+    grep -Fq -- '--- PASS: TestNHOPBBRRejectsNonpositiveDatagramSize (' "$report/xray-congestion-regressions.log" || exit 1
+    for profile in standard conservative aggressive; do
+      for state in minimum initial learned maximum; do
+        grep -Fq -- "--- PASS: TestNHOPBBRPathMTUDecrease/$profile/$state (" "$report/xray-congestion-regressions.log" || exit 1
+      done
+    done
+  fi
   started="$(cat "$report/started-unix")"
   if grep -Fq 'quic-datagram-regressions.log' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
     grep -Fq 'all modules verified' "$report/quic-module-integrity.log" || exit 1
@@ -75,6 +84,25 @@ for arch in amd64 arm64; do
       TestNHOPDatagramReceiveBudgetRejectsWithoutAllocation TestNHOPDatagramReceiveRingWrap \
       TestNHOPDatagramReceiveBudgetConcurrentUse TestNHOPConnectionDatagramBurst; do
       grep -Fq -- "--- PASS: $regression (" "$report/quic-datagram-regressions.log" || exit 1
+    done
+  fi
+  if grep -Fq 'quic-mtu-regressions.log' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
+    for regression in TestNHOPMTUReductionBeforeHandshakeKeepsConfigPrivate TestNHOPMTUReductionUpdatesAllSendLimits \
+      TestNHOPMTUEpochDoesNotWrapAfterRepeatedReduction TestNHOPMTUReductionIgnoresOldLargerPackets \
+      TestNHOPSendQueueReportsMTUWithoutBlocking TestNHOPSendQueueMinimumMTUFailureIsFatal \
+      TestNHOPSendQueueShortGSOSegmentFeedback; do
+      grep -Fq -- "--- PASS: $regression (" "$report/quic-datagram-regressions.log" || exit 1
+    done
+    for regression in TestNHOPMTULossEvidenceRequiresRepeatedUnsupportedSize TestNHOPMTUBlackholePTOAndEpoch \
+      TestNHOPMTUEvidenceExcludesACKOnlyAndProbePackets TestNHOPMTUMigrationStartsNewSizeEpoch TestNHOPPathMTUDecrease; do
+      grep -Fq -- "--- PASS: $regression (" "$report/quic-mtu-regressions.log" || exit 1
+    done
+    for network in udp4 udp6; do
+      for mode in kernel blackhole; do
+        for side in client server; do
+          grep -Fq -- "--- PASS: TestNHOPPathMTUDecrease/$network/$mode/$side (" "$report/quic-mtu-regressions.log" || exit 1
+        done
+      done
     done
   fi
   just payload-report "$report/payload" '1,3' "$started" "linux/$arch" '127.0.0.1'

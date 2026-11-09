@@ -100,6 +100,9 @@ func prepareSendControl(path, sourceSHA string) ([]byte, error) {
 		return []byte(sendControl), nil
 	case sendQueueMTUSource:
 		return []byte(mtuSendControl), nil
+	case sendQueueAdaptiveSource:
+		legacy := strings.Replace(mtuSendControl, "newSendQueue(connection)", "newSendQueue(connection, nil)", 1)
+		return []byte(legacy + adaptiveSendControl), nil
 	default:
 		return nil, fmt.Errorf("unreviewed send error policy")
 	}
@@ -138,6 +141,50 @@ func TestNHOPSendQueueSizeDrop(t *testing.T) {
 			}
 		})
 	}
+}
+`
+
+// With a recovery owner, larger data packets report their size and the queue
+// continues. A failure at QUIC's minimum size must still terminate the queue.
+const adaptiveSendControl = `
+func TestNHOPSendQueuePMTUFeedback(t *testing.T) {
+	for _, failure := range []error{syscall.EMSGSIZE, &DatagramTooLargeError{MaxDatagramPayloadSize: 1200}} {
+		synctest.Test(t, func(t *testing.T) { observeAdaptiveMTUPolicy(t, failure, 1300) })
+	}
+}
+
+func TestNHOPSendQueuePMTUMinimum(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) { observeAdaptiveMTUPolicy(t, syscall.EMSGSIZE, 1200) })
+}
+
+func observeAdaptiveMTUPolicy(t *testing.T, failure error, size int) {
+	t.Helper()
+	connection := NewMockSendConn(gomock.NewController(t))
+	feedback := make(chan protocol.ByteCount, 1)
+	queue := newSendQueue(connection, feedback)
+	first := connection.EXPECT().Write(gomock.Any(), uint16(0), protocol.ECNNon).Return(failure)
+	packet := getPacketWithContents(make([]byte, size))
+	queue.Send(packet, 0, protocol.ECNNon)
+	if size > 1200 {
+		connection.EXPECT().Write([]byte("after-drop"), uint16(10), protocol.ECNNon).Return(nil).After(first.Call)
+		queue.Send(getPacketWithContents([]byte("after-drop")), 10, protocol.ECNNon)
+	}
+	finished := make(chan error, 1)
+	go func() { finished <- queue.Run() }()
+	synctest.Wait()
+	queue.Close()
+	err := <-finished
+	terminal := size <= 1200
+	if terminal && !errors.Is(err, failure) || !terminal && err != nil || packet.refCount != 0 {
+		t.Fatalf("changed adaptive MTU error or buffer ownership: %v refs=%d", err, packet.refCount)
+	}
+	if terminal && len(feedback) != 0 || !terminal && len(feedback) != 1 {
+		t.Fatalf("changed adaptive MTU notification: %d", len(feedback))
+	}
+	if !terminal && <-feedback != protocol.ByteCount(size) {
+		t.Fatal("changed rejected logical packet size")
+	}
+	fmt.Printf("NHOP_ADAPTIVE_SEND_POLICY size=%d terminal=%t preserved=true\n", size, terminal)
 }
 `
 
