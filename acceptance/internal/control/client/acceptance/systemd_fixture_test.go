@@ -3,6 +3,7 @@ package acceptance
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -170,4 +171,78 @@ func serviceJournal(t *testing.T, name string) {
 	if err != nil {
 		t.Error("cannot collect service journal", err)
 	}
+}
+
+// Fault rules live in the outer, owned namespace, never in the client namespace
+// or guest root network. nft's create transaction refuses an existing table.
+func remoteFault(t *testing.T, mode string) func() {
+	t.Helper()
+	checkIsolation(t)
+	tcp, udp := "drop", "drop"
+	if mode == "reject" {
+		tcp, udp = "reject with tcp reset", "reject with icmpx type port-unreachable"
+	} else if mode != "drop" {
+		t.Fatal("unsupported remote fault mode")
+	}
+	script := "create table inet nhop_exit_outage\nadd chain inet nhop_exit_outage input { type filter hook input priority -10; policy accept; }\n"
+	for _, rule := range [][2]string{{"tcp", tcp}, {"udp", udp}} {
+		script += "add rule inet nhop_exit_outage input ip saddr 198.51.100.8 ip daddr 198.51.100.7 " + rule[0] + " dport 24443 counter " + rule[1] + " comment \"" + rule[0] + "\"\n"
+	}
+	path := filepath.Join(t.TempDir(), "exit-outage.nft")
+	if err := safeio.Create(path, []byte(script), 0600); err != nil {
+		t.Fatal(err)
+	}
+	remoteNFT(t, "-f", path)
+	t.Logf("applied remote port fault: %s", script)
+	removed := false
+	restore := func() {
+		if !removed {
+			remoteNFT(t, "delete", "table", "inet", "nhop_exit_outage")
+			removed = true
+		}
+	}
+	t.Cleanup(restore)
+	return restore
+}
+
+func remoteNFT(t *testing.T, args ...string) []byte {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	raw, err := exec.CommandContext(ctx, "nft", args...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("owned remote fault command failed: %v %s", err, raw)
+	}
+	return raw
+}
+
+func remoteFaultCounters(t *testing.T) map[string]uint64 {
+	t.Helper()
+	raw := remoteNFT(t, "-j", "list", "table", "inet", "nhop_exit_outage")
+	t.Logf("observed remote port fault: %s", raw)
+	var value struct {
+		NFTables []struct {
+			Rule *struct {
+				Comment string
+				Expr    []struct{ Counter *struct{ Packets uint64 } }
+			}
+		}
+	}
+	if err := json.Unmarshal(raw, &value); err != nil {
+		t.Fatal(err)
+	}
+	counters := map[string]uint64{}
+	for _, item := range value.NFTables {
+		if item.Rule != nil {
+			for _, expr := range item.Rule.Expr {
+				if expr.Counter != nil {
+					counters[item.Rule.Comment] += expr.Counter.Packets
+				}
+			}
+		}
+	}
+	if len(counters) != 2 || counters["tcp"] == 0 || counters["udp"] == 0 {
+		t.Fatal("remote fault did not intercept both transports", counters)
+	}
+	return counters
 }

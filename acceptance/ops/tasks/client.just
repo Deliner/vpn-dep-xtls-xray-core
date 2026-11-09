@@ -98,10 +98,15 @@ client-reboot-lab-stop:
 client-reboot-lab-shell node +args:
     bash ops/testing/client/install/reboot/vm.sh shell "$@"
 
+# Switch only boot-client to NetworkManager with a local timed fallback, or restore its networkd baseline.
+[group('client')]
+client-reboot-lab-network action:
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/reboot/network.sh "$1"
+
 # Reboot the owned Linux client VM with a separate exit, early leak probe and local recovery timer.
 [group('client')]
-client-reboot-test xray singbox:
-    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/reboot/run.sh "$1" "$2"
+client-reboot-test xray singbox manager='systemd-networkd.service':
+    @bash ops/quality/check.sh static-analysis bash ops/testing/client/install/reboot/run.sh "$1" "$2" "$3"
 
 # Show credential-free local session status; unavailable controllers are explicitly labelled.
 [group('client')]

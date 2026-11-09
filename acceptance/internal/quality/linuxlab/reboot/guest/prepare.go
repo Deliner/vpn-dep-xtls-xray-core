@@ -45,7 +45,7 @@ func Arm(ctx context.Context, config contract.Config) error {
 	if _, err := Manager(ctx, "enable", contract.CanaryUnit, contract.RecoveryTimer); err != nil {
 		return err
 	}
-	if _, err := Client(ctx, "service-enable", "--network-manager", "systemd-networkd.service"); err != nil {
+	if _, err := Client(ctx, "service-enable", "--network-manager", config.NetworkManager); err != nil {
 		return err
 	}
 	for _, name := range []string{contract.CanaryUnit, contract.RecoveryTimer} {

@@ -30,6 +30,7 @@ func exerciseManaged(t *testing.T, service managedService, probe *controller, in
 	activeTraffic(t, probe)
 	checkSystemDNS(t, probe, dns, "tunnel")
 	canary := directCanary(t)
+	exerciseRemoteOutage(t, service, probe, started, dns)
 	watch := startLeakWatch(t)
 	for _, failure := range []string{"native", "frontend", "controller", "restart"} {
 		started = recoverManaged(t, service, probe, started, failure, dns)
@@ -149,4 +150,75 @@ func finishManaged(t *testing.T, service managedService, probe *controller, init
 	if err := safeio.CheckAccess(service.profile, 0600, 0, 0); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// The exit remains alive. Only its VPN port is unavailable; the direct-leak
+// receiver and DNS controls stay reachable outside the client's protection.
+func exerciseRemoteOutage(t *testing.T, service managedService, probe *controller, started clientcontrol.Diagnostic, dns *dnsOrigins) {
+	t.Helper()
+	for _, mode := range []string{"drop", "reject"} {
+		if !t.Run("remote-"+mode, func(t *testing.T) { remoteOutage(t, service, probe, started, dns, mode) }) {
+			t.FailNow()
+		}
+	}
+}
+
+func remoteOutage(t *testing.T, service managedService, probe *controller, started clientcontrol.Diagnostic, dns *dnsOrigins, mode string) {
+	t.Helper()
+	identity := serviceCommand(t, "show", service.name, "-p", "MainPID", "-p", "NRestarts")
+	routes := probe.call(t, "routes").Routes
+	watch := startLeakWatch(t)
+	restore := remoteFault(t, mode)
+	begin := time.Now()
+	for range 2 {
+		checkTraffic(t, probe, false)
+		checkUDP6(t, probe, false)
+		checkSystemDNS(t, probe, dns, "blocked")
+	}
+	if remaining := 5*time.Second - time.Since(begin); remaining > 0 {
+		time.Sleep(remaining)
+	}
+	counters := remoteFaultCounters(t)
+	unchangedRemoteClient(t, service, probe, started, identity, routes)
+	restore()
+	recovery := time.Now()
+	waitRemoteTraffic(t, probe)
+	checkSystemDNS(t, probe, dns, "tunnel")
+	unchangedRemoteClient(t, service, probe, started, identity, routes)
+	watch.stop(t)
+	if watch.attempts < 20 {
+		t.Fatal("remote outage had insufficient direct leak attempts")
+	}
+	t.Logf("remote outage mode=%s blocked_tcp=%d blocked_udp=%d unavailable_ms=%d recovery_ms=%d direct_attempts=%d; client PIDs, restart count, routes and guard retained", mode, counters["tcp"], counters["udp"], recovery.Sub(begin).Milliseconds(), time.Since(recovery).Milliseconds(), watch.attempts)
+}
+
+func unchangedRemoteClient(t *testing.T, service managedService, probe *controller, started clientcontrol.Diagnostic, identity, routes string) {
+	t.Helper()
+	current := cliCall(t, "diagnostics")
+	if current.Controller != "active" || current.Error != "" || current.Directory != started.Directory || current.Status != started.Status {
+		t.Fatal("remote outage changed the local client or protection", current)
+	}
+	if serviceCommand(t, "show", service.name, "-p", "MainPID", "-p", "NRestarts") != identity ||
+		probe.call(t, "routes").Routes != routes || observedGuard(t, probe) != started.Status.Guard {
+		t.Fatal("remote outage restarted the controller or replaced routing/firewall ownership")
+	}
+}
+
+func waitRemoteTraffic(t *testing.T, probe *controller) {
+	t.Helper()
+	deadline := time.Now().Add(12 * time.Second)
+	for time.Now().Before(deadline) {
+		ready := true
+		for _, operation := range []string{"probe", "probe-udp", "probe6", "probe-udp6"} {
+			allowed := !strings.HasSuffix(operation, "6") || os.Getenv("NHOP_CLIENT_IPV6") == "tunnel"
+			if (probe.call(t, operation).Error == "") != allowed {
+				ready = false
+			}
+		}
+		if ready {
+			return
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
+	t.Fatal("traffic did not recover after the remote VPN port returned")
 }

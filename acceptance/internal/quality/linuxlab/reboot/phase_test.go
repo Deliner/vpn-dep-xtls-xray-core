@@ -88,5 +88,5 @@ func (f *fixture) verify(t *testing.T, name string, before, after contract.PeerM
 			t.Fatal("system DNS probe has no matching peer-side query evidence")
 		}
 	}
-	verifyOrder(t, result)
+	verifyOrder(t, f.config["boot-client"].NetworkManager, result)
 }

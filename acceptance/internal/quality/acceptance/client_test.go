@@ -11,7 +11,7 @@ import (
 )
 
 func TestSystemdCollectorRejectsMissingRecoveryLeaksAndChangedUnits(t *testing.T) {
-	for _, damage := range []string{"", "released-gap", "missing-controller", "direct-leak", "counter-gap", "short-log", "empty-canary", "changed-unit", "cleanup-unit", "wrong-policy", "missing-disconnect", "early-disconnect", "disconnect-gap"} {
+	for _, damage := range []string{"", "released-gap", "missing-controller", "direct-leak", "counter-gap", "short-log", "empty-canary", "changed-unit", "cleanup-unit", "wrong-policy", "missing-disconnect", "early-disconnect", "disconnect-gap", "missing-remote", "duplicate-remote", "remote-counter", "remote-duration", "remote-attempts", "remote-failed"} {
 		t.Run(damage, func(t *testing.T) {
 			directory := t.TempDir()
 			log := serviceEvidence
@@ -39,6 +39,18 @@ func TestSystemdCollectorRejectsMissingRecoveryLeaksAndChangedUnits(t *testing.T
 
 func damageServiceEvidence(damage, log, unit string) (string, string) {
 	switch damage {
+	case "missing-remote":
+		log = strings.ReplaceAll(log, "remote outage mode=drop", "missing outage mode=drop")
+	case "duplicate-remote":
+		log = strings.ReplaceAll(log, "mode=reject", "mode=drop")
+	case "remote-counter":
+		log = strings.ReplaceAll(log, "blocked_udp=13", "blocked_udp=0")
+	case "remote-duration":
+		log = strings.ReplaceAll(log, "unavailable_ms=8000", "unavailable_ms=50")
+	case "remote-attempts":
+		log = strings.ReplaceAll(log, "direct_attempts=500", "direct_attempts=0")
+	case "remote-failed":
+		log = strings.ReplaceAll(log, "--- PASS: TestKernelSystemdManagedRecovery/remote-drop", "--- FAIL: TestKernelSystemdManagedRecovery/remote-drop")
 	case "released-gap":
 		log = strings.ReplaceAll(log, "system DNS direct: direct=2->3", "system DNS direct: direct=3->4")
 	case "missing-disconnect":
@@ -99,19 +111,29 @@ const serviceEvidence = `native client acceptance: linux/amd64; private mount an
 systemd policy IPv6=tunnel: systemd 255
 system DNS direct: direct=0->2 HTTPS=0->0
 system DNS tunnel: direct=2->2 HTTPS=0->2
+system DNS blocked: direct=2->2 HTTPS=2->2
+system DNS blocked: direct=2->2 HTTPS=2->2
 system DNS tunnel: direct=2->2 HTTPS=2->4
-systemd recovered native; MainPID=123
+remote outage mode=drop blocked_tcp=42 blocked_udp=13 unavailable_ms=8000 recovery_ms=10 direct_attempts=500; client PIDs, restart count, routes and guard retained
+--- PASS: TestKernelSystemdManagedRecovery/remote-drop (8.10s)
+system DNS blocked: direct=2->2 HTTPS=4->4
+system DNS blocked: direct=2->2 HTTPS=4->4
 system DNS tunnel: direct=2->2 HTTPS=4->6
-systemd recovered frontend; MainPID=234
+remote outage mode=reject blocked_tcp=42 blocked_udp=13 unavailable_ms=8000 recovery_ms=10 direct_attempts=500; client PIDs, restart count, routes and guard retained
+--- PASS: TestKernelSystemdManagedRecovery/remote-reject (8.10s)
 system DNS tunnel: direct=2->2 HTTPS=6->8
-systemd recovered controller; MainPID=345
+systemd recovered native; MainPID=123
 system DNS tunnel: direct=2->2 HTTPS=8->10
-systemd recovered restart; MainPID=456
+systemd recovered frontend; MainPID=234
 system DNS tunnel: direct=2->2 HTTPS=10->12
-system DNS blocked: direct=2->2 HTTPS=12->12
+systemd recovered controller; MainPID=345
+system DNS tunnel: direct=2->2 HTTPS=12->14
+systemd recovered restart; MainPID=456
+system DNS tunnel: direct=2->2 HTTPS=14->16
+system DNS blocked: direct=2->2 HTTPS=16->16
 systemd direct UDP: attempts=9000 delivered=0; same firewall lease retained
-system DNS disconnect requested: direct=2 HTTPS=12
-system DNS direct: direct=2->3 HTTPS=12->12
+system DNS disconnect requested: direct=2 HTTPS=16
+system DNS direct: direct=2->3 HTTPS=16->16
 --- PASS: TestKernelSystemdManagedRecovery (18.15s)
 PASS
 `

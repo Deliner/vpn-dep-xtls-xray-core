@@ -20,12 +20,13 @@ const RecoveryUnit = "nhop-reboot-recover.service"
 const RecoveryTimer = "nhop-reboot-recover.timer"
 
 type Config struct {
-	SchemaVersion int    `json:"schema_version"`
-	Token         string `json:"token"`
-	Role          string `json:"role"`
-	ClientIP      string `json:"client_ip"`
-	PeerIP        string `json:"peer_ip"`
-	Interface     string `json:"interface"`
+	SchemaVersion  int    `json:"schema_version"`
+	Token          string `json:"token"`
+	Role           string `json:"role"`
+	ClientIP       string `json:"client_ip"`
+	PeerIP         string `json:"peer_ip"`
+	Interface      string `json:"interface"`
+	NetworkManager string `json:"network_manager"`
 }
 
 type Phase struct {
@@ -36,11 +37,14 @@ type Phase struct {
 
 func (c Config) Validate() error {
 	token, err := hex.DecodeString(c.Token)
-	if err != nil || len(token) != 32 || c.SchemaVersion != 1 {
+	if err != nil || len(token) != 32 || c.SchemaVersion != 2 {
 		return fmt.Errorf("invalid reboot lab identity")
 	}
 	if c.Role != "boot-client" && c.Role != "boot-exit" || c.Interface != "eth0" || c.ClientIP == c.PeerIP {
 		return fmt.Errorf("unexpected reboot lab role or interface")
+	}
+	if c.NetworkManager != "systemd-networkd.service" && c.NetworkManager != "NetworkManager.service" {
+		return fmt.Errorf("unsupported reboot network manager")
 	}
 	for _, text := range []string{c.ClientIP, c.PeerIP} {
 		address, err := netip.ParseAddr(text)

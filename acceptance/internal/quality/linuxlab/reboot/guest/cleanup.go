@@ -39,7 +39,7 @@ func Restore(ctx context.Context, config contract.Config, phase contract.Phase) 
 	if _, err := Manager(ctx, "disable", contract.CanaryUnit, contract.RecoveryTimer); err != nil {
 		return err
 	}
-	_, err := Manager(ctx, "start", "systemd-networkd.service")
+	_, err := Manager(ctx, "start", config.NetworkManager)
 	return err
 }
 

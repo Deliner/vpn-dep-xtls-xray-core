@@ -10,13 +10,13 @@ import (
 	"vpn-script/internal/quality/linuxlab/reboot/contract"
 )
 
-func verifyOrder(t *testing.T, result contract.Recovery) {
+func verifyOrder(t *testing.T, manager string, result contract.Recovery) {
 	t.Helper()
 	values := result.Observations
 	canary := monotonic(t, values[contract.CanaryUnit+".properties"], "ActiveEnterTimestampMonotonic")
 	guardStart := monotonic(t, values["nhop-client-boot.service.properties"], "ExecMainStartTimestampMonotonic")
 	guardDone := monotonic(t, values["nhop-client-boot.service.properties"], "ExecMainExitTimestampMonotonic")
-	network := monotonic(t, values["systemd-networkd.service.properties"], "ExecMainStartTimestampMonotonic")
+	network := monotonic(t, values[manager+".properties"], "ExecMainStartTimestampMonotonic")
 	client := monotonic(t, values["nhop-client.service.properties"], "ExecMainStartTimestampMonotonic")
 	if canary == 0 || guardStart < canary || guardDone < guardStart {
 		t.Fatal("early probe/guard ordering was not enforced")
@@ -53,7 +53,7 @@ func (f *fixture) metrics(t *testing.T, name string) contract.PeerMetrics {
 
 func (f *fixture) units(t *testing.T, phase string) {
 	t.Helper()
-	names := []string{"nhop-client.service", "nhop-client-boot.service", "systemd-networkd.service", contract.CanaryUnit, contract.RecoveryUnit, contract.RecoveryTimer}
+	names := []string{"nhop-client.service", "nhop-client-boot.service", f.config["boot-client"].NetworkManager, contract.CanaryUnit, contract.RecoveryUnit, contract.RecoveryTimer}
 	raw := f.remote(t, "boot-client", append([]string{"systemctl", "cat"}, names...)...)
 	require(t, safeio.Atomic(filepath.Join(f.root, phase+"-units.txt"), raw, 0600))
 	args := []string{"systemd-analyze", "verify"}
@@ -67,7 +67,7 @@ func (f *fixture) units(t *testing.T, phase string) {
 func (f *fixture) journal(t *testing.T, role, phase string) {
 	t.Helper()
 	args := []string{"journalctl", "--no-pager", "-b", "-o", "short-monotonic"}
-	for _, name := range []string{"nhop-client.service", "nhop-client-boot.service", "systemd-networkd.service", contract.CanaryUnit, contract.RecoveryUnit, contract.RecoveryTimer, contract.PeerUnit} {
+	for _, name := range []string{"nhop-client.service", "nhop-client-boot.service", f.config[role].NetworkManager, contract.CanaryUnit, contract.RecoveryUnit, contract.RecoveryTimer, contract.PeerUnit} {
 		args = append(args, "-u", name)
 	}
 	raw := f.remote(t, role, args...)

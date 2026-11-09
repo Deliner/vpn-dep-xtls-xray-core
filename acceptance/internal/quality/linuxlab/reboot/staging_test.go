@@ -3,6 +3,7 @@ package reboot
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,7 +32,11 @@ func (f *fixture) identify(t *testing.T) {
 	_, err := rand.Read(token[:])
 	require(t, err)
 	for _, role := range roles {
-		config := contract.Config{SchemaVersion: 1, Role: role, Token: hex.EncodeToString(token[:]), ClientIP: addresses["boot-client"], PeerIP: addresses["boot-exit"], Interface: "eth0"}
+		manager := "systemd-networkd.service"
+		if role == "boot-client" {
+			manager = os.Getenv("NHOP_REBOOT_NETWORK_MANAGER")
+		}
+		config := contract.Config{SchemaVersion: 2, Role: role, Token: hex.EncodeToString(token[:]), ClientIP: addresses["boot-client"], PeerIP: addresses["boot-exit"], Interface: "eth0", NetworkManager: manager}
 		require(t, config.Validate())
 		f.config[role] = config
 	}

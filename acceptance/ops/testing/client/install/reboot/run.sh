@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-[[ $# == 2 ]] || exit 2
+[[ $# == 3 ]] || exit 2
+case "$3" in systemd-networkd.service|NetworkManager.service) ;; *) exit 2 ;; esac
+export NHOP_REBOOT_NETWORK_MANAGER="$3"
 source "$(dirname "${BASH_SOURCE[0]}")/environment.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../../runtime/integrity.sh"
 reboot_lab_environment
@@ -10,6 +12,7 @@ run="$(mktemp -d "$reboot_data/runs/run-XXXXXXXX")"
 printf 'preparing\n' > "$run/status"
 trap 'result=$?; if ((result != 0)); then printf "failed\n" > "$run/status"; fi' EXIT
 mkdir "$run/bin"
+printf '%s\n' "$NHOP_REBOOT_NETWORK_MANAGER" > "$run/network-manager.txt"
 for directory in "$1" "$2"; do
   candidate_complete "$directory"
   [[ "$(sed -n 's/^target=//p' "$directory/provenance.txt")" == "linux/$lab_arch" ]] || exit 2

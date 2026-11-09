@@ -73,7 +73,8 @@ client_verify_recovery() {
   awk '/systemd direct UDP: attempts=[0-9]+ delivered=0; same firewall lease retained/ {
     value=$0; sub(/^.*attempts=/,"",value); if (value+0 < 20) bad=1; count++
   } END { exit bad || count != 1 }' "$mode/guest.log" || return 1
-  client_verify_dns "$mode/guest.log" 2 6 1 1 1 || return 1
+  client_verify_remote "$mode/guest.log" "$test_name" || return 1
+  client_verify_dns "$mode/guest.log" 2 8 5 1 1 || return 1
 }
 
 client_verify_service_unit() {
@@ -110,4 +111,26 @@ client_verify_dns() {
     if (kind=="blocked" && !(direct[1]==direct[2] && https[1]==https[2])) bad=1
     seen=1; disconnected=0; previous_direct=direct[2]+0; previous_https=https[2]+0; counts[kind]++
   } END { exit bad || disconnected || disconnects != disconnect_count || counts["direct"] != direct_count || counts["tunnel"] != tunnel_count || counts["blocked"] != blocked_count }' "$1" || return 1
+}
+
+
+# New managed-service evidence must include both transport faults. Historical
+# artifacts remain tied to their frozen collector; absence is never a skip.
+client_verify_remote() {
+  awk -v name="$2" '
+  /remote outage mode=/ {
+    value=$0; sub(/^.*remote outage /,"",value)
+    expected="; client PIDs, restart count, routes and guard retained"
+    if (substr(value,length(value)-length(expected)+1)!=expected) bad=1
+    sub(/;.*/,"",value); if (split(value,f,/ +/)!=6) bad=1
+    if (f[1]!~/^mode=(drop|reject)$/ || f[2]!~/^blocked_tcp=[0-9]+$/ || f[3]!~/^blocked_udp=[0-9]+$/ || f[4]!~/^unavailable_ms=[0-9]+$/ || f[5]!~/^recovery_ms=[0-9]+$/ || f[6]!~/^direct_attempts=[0-9]+$/) bad=1
+    mode=f[1]; sub(/^mode=/,"",mode)
+    for (i=2;i<=6;i++) sub(/^[^=]*=/,"",f[i])
+    if (f[2]+0<1 || f[3]+0<1 || f[4]+0<5000 || f[5]+0>20000 || f[6]+0<20) bad=1
+    seen[mode]++
+  }
+  index($0,"--- PASS: " name "/remote-drop (") { passed["drop"]++ }
+  index($0,"--- PASS: " name "/remote-reject (") { passed["reject"]++ }
+  END { exit bad || seen["drop"]!=1 || seen["reject"]!=1 || passed["drop"]!=1 || passed["reject"]!=1 }
+  ' "$1" || return 1
 }
