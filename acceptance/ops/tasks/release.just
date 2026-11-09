@@ -74,3 +74,38 @@ cronet-release-verify-stage directory:
 [group('release')]
 cronet-release-publish directory:
     @bash ops/quality/check.sh static-analysis bash ops/release/runtime/cronet/publish.sh "$1"
+
+# Bind sing-box source, both runtime files and successful audits to reviewed native protocol evidence.
+[group('release')]
+singbox-release-verify policy arch candidate native_report:
+    @bash ops/quality/check.sh static-analysis go run ./cmd/runtimepack singbox-verify "$1" "$2" "$3" "$4"
+
+# Package reviewed native sing-box and Cronet together with the complete tested Go source tree.
+[group('release')]
+singbox-release-package policy arch candidate native_report output:
+    @bash ops/quality/check.sh static-analysis go run ./cmd/runtimepack singbox-package "$1" "$2" "$3" "$4" "$5"
+
+# Reconstruct the reviewed source/runtime inventory from a downloaded sing-box tar.gz.
+[group('release')]
+singbox-release-archive-verify policy arch archive:
+    @bash ops/quality/check.sh static-analysis go run ./cmd/runtimepack singbox-archive-verify "$1" "$2" "$3"
+
+# Restore only omitted hidden source files from the retained pinned archive into a new candidate copy.
+[group('release')]
+singbox-release-recover policy arch candidate native_report output:
+    @bash ops/quality/check.sh static-analysis bash ops/release/runtime/singbox/recover.sh "$1" "$2" "$3" "$4" "$5"
+
+# Assemble reviewed sing-box archives with complete Cronet sources and notices into twelve release assets.
+[group('release')]
+singbox-release-stage amd64 arm64 cronet output:
+    @bash ops/quality/check.sh static-analysis bash ops/release/runtime/singbox/stage.sh "$1" "$2" "$3" "$4"
+
+# Verify every downloaded sing-box publication asset against the reviewed native inputs.
+[group('release')]
+singbox-release-verify-stage directory:
+    @bash ops/quality/check.sh static-analysis bash ops/release/runtime/singbox/verify.sh "$1"
+
+# MUTATES GITHUB: publish a verified sing-box draft with Actions temporarily disabled; restore its original policy.
+[group('release')]
+singbox-release-publish directory:
+    @bash ops/quality/check.sh static-analysis bash ops/release/runtime/singbox/actions.sh "$1"

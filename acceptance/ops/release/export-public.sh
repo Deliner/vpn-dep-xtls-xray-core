@@ -13,7 +13,8 @@ case "$output" in
 esac
 root="$stage/vpn-script"
 install -d -m 0755 "$root"
-files=(.gitignore AGENTS.md README.md go.mod go.sum justfile .github/workflows/go.yml ops/release/runtime/xray.json)
+files=(.gitignore AGENTS.md README.md go.mod go.sum justfile .github/workflows/go.yml
+  ops/release/runtime/xray.json ops/release/runtime/cronet.json ops/release/runtime/sing-box.json)
 
 while IFS= read -r -d '' source; do
   files+=("${source#"$repo_root/"}")

@@ -17,6 +17,9 @@ func main() {
 }
 
 func run(args []string) error {
+	if len(args) > 0 && strings.HasPrefix(args[0], "singbox-") {
+		return singbox(args)
+	}
 	if len(args) == 4 && args[0] == "source-package" {
 		return attribution.Package(args[2], args[1], args[3])
 	}

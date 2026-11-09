@@ -22,6 +22,7 @@ func TestSourceExportBuildsEmbeddedViewsAndExcludesPrivateInputs(t *testing.T) {
 	}
 	files := exportedFiles(t, archive)
 	for _, name := range []string{"internal/ui/views/page.html", "internal/ui/views/style.css", "ops/release/runtime/xray.json",
+		"ops/release/runtime/cronet.json", "ops/release/runtime/sing-box.json",
 		"ops/testing/acceptance/installer/workflow.yml", "ops/testing/cronet/zlib/window.c", "ops/testing/cronet/zlib/window.patch"} {
 		raw, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil || files[name] != string(raw) || !strings.Contains(files["ops/release/SHA256SUMS"], safeio.Hash(raw)+"  vpn-script/"+name+"\n") {
@@ -48,7 +49,7 @@ func exportFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	for _, name := range []string{".gitignore", "AGENTS.md", "README.md", "go.sum", "justfile", ".github/workflows/go.yml",
-		"ops/release/runtime/xray.json", "ops/release/runtime/private.json",
+		"ops/release/runtime/xray.json", "ops/release/runtime/cronet.json", "ops/release/runtime/sing-box.json", "ops/release/runtime/private.json",
 		"ops/testing/acceptance/installer/workflow.yml",
 		"ops/testing/cronet/zlib/window.c", "ops/testing/cronet/zlib/window.patch",
 		"ops/runtime/inputs.tsv", "docs/public.md", "examples/example.yaml", "config.env", "build/private.html", ".ssh-custom/key.go", "docs/private.local.md"} {

@@ -10,6 +10,29 @@ import (
 	"vpn-script/internal/platform/safeio"
 )
 
+// VerifyInventory binds bytes to a reviewed manifest and requires every file in
+// the named input trees to be covered. Engine-specific policy belongs to callers.
+func VerifyInventory(root, name, expected string, trees ...string) (map[string]string, error) {
+	entries, err := inventory(root, name, expected)
+	if err != nil {
+		return nil, err
+	}
+	for _, tree := range trees {
+		if !fs.ValidPath(tree) || strings.Contains(tree, "\\") {
+			return nil, fmt.Errorf("unsafe inventory tree")
+		}
+		if err := completeTree(root, tree, entries); err != nil {
+			return nil, err
+		}
+	}
+	return entries, nil
+}
+
+// ReadRegular rejects path traversal, symlinks and oversized release inputs.
+func ReadRegular(root, name string, limit int64) ([]byte, error) {
+	return readRegular(root, name, limit)
+}
+
 func readRegular(root, name string, limit int64) ([]byte, error) {
 	if !fs.ValidPath(name) || strings.Contains(name, "\\") {
 		return nil, fmt.Errorf("unsafe inventory path: %q", name)

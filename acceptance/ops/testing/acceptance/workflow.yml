@@ -44,5 +44,6 @@ jobs:
         with:
           name: runtime-linux-${{ matrix.arch }}
           path: acceptance/build/runtime-candidates
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30

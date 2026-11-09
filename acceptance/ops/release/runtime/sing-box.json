@@ -1,0 +1,28 @@
+{
+  "version": "1.14.4",
+  "label": "nhop-fork-cronet154-zlib-1",
+  "source_url": "https://codeload.github.com/Deliner/vpn-dep-sagernet-sing-box/tar.gz/f7e15a404d9d5809b209488a223d830f9307eda8",
+  "source_sha256": "94406dfbe020411a7d2ebc185f18c5abd8a9bb025ac4df6c7e6870664db68bf0",
+  "workflow_sha": "5e4ef3d64c269495fa5f42e706f2019bdc17da76",
+  "run_id": "42665559172",
+  "targets": {
+    "amd64": {
+      "binary_sha256": "2679fe9a5273436ad26727b0fbcb4543d291217ec6f9a4f32e9b6f551171500c",
+      "library_sha256": "3af62b3defa63ce2e666ee197f84664975455496822528ce6d886de50a6a212e",
+      "inventory_sha256": "05c97224df8140e7b5690b8355e8470369d451a6f2a89012cbe2ebc04a1ff37e",
+      "evidence_sha256": "93e98f3e386272168b8cc57cb0824700afaae8ff7e348cff3a486e1ecd6b154f",
+      "provenance_sha256": "9c928723ae4a574a66a4c405662341c9b6d56c17f9a9386243dd7f768191b6eb",
+      "source_audit_sha256": "26da8624c6668004bc111d67ce4f560dc37ed1f4843aa7e4975519fbb1874553",
+      "binary_audit_sha256": "4e64c690c5ccad5b324dd489c0d179711d26f83a198528ad5d5516439eb1b0b3"
+    },
+    "arm64": {
+      "binary_sha256": "198ee184704d5e2c1edffb124f57074f216137bb349348e33f5c8e206c24752e",
+      "library_sha256": "76225cdf2dad750ad3f8d9819d52ba325693883711cc3c1a97ef8fdbf6b6f2e4",
+      "inventory_sha256": "2d6c3fa844b18aca086d3369148c0c96ff74b0070cf0e2e848eaef72f2423e04",
+      "evidence_sha256": "ce7ffcbe62c3ec59b98129e658fa92ad6b503263418b1db0a0394ca9ea855131",
+      "provenance_sha256": "c0af44f702b51fc2b99eaf28f5bfa07a9f781adff61e32d9f773dcca5321b28a",
+      "source_audit_sha256": "69cefce8a44c7e954d668aa28801e745816265db49038736b92b9cca92d29ead",
+      "binary_audit_sha256": "4e64c690c5ccad5b324dd489c0d179711d26f83a198528ad5d5516439eb1b0b3"
+    }
+  }
+}
