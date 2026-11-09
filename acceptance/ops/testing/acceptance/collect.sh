@@ -76,6 +76,23 @@ for arch in amd64 arm64; do
       done
     done
   fi
+  if grep -Fq 'xray-tcp-regressions.log' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
+    for regression in TestNHOPTCPReorderingLossThreshold TestNHOPTCPNewSmallSACKsTriggerRecovery \
+      TestNHOPTCPSelectiveACKAfterCumulativeProgress TestNHOPTCPNonSACKDuplicateThreshold \
+      TestNHOPTCPReorderingDoesNotRetransmitEarly TestNHOPRemoteTCPReordering \
+      TestTCPRetransmit TestTCPLossAgain; do
+      grep -Fq -- "--- PASS: $regression (" "$report/xray-tcp-regressions.log" || exit 1
+    done
+    for base in 000003e8 ffffff80; do
+      for scenario in no-sack one-segment two-segments two-islands overlap adjacent \
+        past-flight before-ack more-than-two three-islands; do
+        grep -Fq -- "--- PASS: TestNHOPTCPReorderingLossThreshold/$base/$scenario (" "$report/xray-tcp-regressions.log" || exit 1
+      done
+    done
+    for address in '10.0.0.1:1234' '[fd00::1]:1234'; do
+      grep -Fq -- "--- PASS: TestNHOPTCPReorderingDoesNotRetransmitEarly/$address (" "$report/xray-tcp-regressions.log" || exit 1
+    done
+  fi
   started="$(cat "$report/started-unix")"
   if grep -Fq 'quic-datagram-regressions.log' "$acceptance_checkout/acceptance/ops/testing/acceptance/run.sh"; then
     grep -Fq 'all modules verified' "$report/quic-module-integrity.log" || exit 1
