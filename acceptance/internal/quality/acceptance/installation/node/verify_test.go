@@ -31,6 +31,38 @@ func TestTrafficRequiresEveryProtocolDuringEveryLifecyclePhase(t *testing.T) {
 	}
 }
 
+func TestRetainedRuntimeEvidenceRequiresBothRolesAndCapturedBytes(t *testing.T) {
+	for _, damage := range []string{"", "missing-role", "wrong-sha", "capture-error", "unverified", "changed-bytes", "wrong-cpu", "wrong-directory"} {
+		t.Run(damage, func(t *testing.T) {
+			directory, sha, result := fixtureRuntime(t)
+			arch, location := "amd64", "previous-runtimes"
+			switch damage {
+			case "missing-role":
+				delete(result.Runtimes, "client/xray")
+			case "wrong-sha", "capture-error", "unverified":
+				value := result.Runtimes["server/xray"]
+				if damage == "wrong-sha" {
+					value.SHA = strings.Repeat("b", 64)
+				} else if damage == "capture-error" {
+					value.Error = "incomplete capture"
+				} else {
+					value.Verified = false
+				}
+				result.Runtimes["server/xray"] = value
+			case "changed-bytes":
+				write(t, filepath.Join(directory, "previous-runtimes/xray"), []byte("changed"))
+			case "wrong-cpu":
+				arch = "arm64"
+			case "wrong-directory":
+				location = "runtimes"
+			}
+			if err := observedRuntimeFiles(directory, location, arch, "xray", sha, result); (err == nil) != (damage == "") {
+				t.Fatalf("retained runtime evidence mismatch: %v", err)
+			}
+		})
+	}
+}
+
 func TestLifecycleRequiresUpgradeCacheAndAccessEvidence(t *testing.T) {
 	path := fixtureReportFile(t, fixtureReport())
 	_, err := verifyReport(path)

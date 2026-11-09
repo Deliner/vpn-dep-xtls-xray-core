@@ -13,7 +13,7 @@ import (
 var phases = []string{"initial", "installer-rolled-back", "installer-upgraded", "access-restored", "interrupted-restored", "updated", "rolled-back", "recovered"}
 var flags = []string{"unchanged_pid", "rolled_back", "stopped_service_recovered", "old_ports_released", "clean_stop",
 	"installer_upgraded", "installer_upgrade_rolled_back", "cache_miss_blocked", "cache_offline_lifecycle", "installed_access_protected",
-	"service_identity_protected", "udp22_with_existing_tcp_ssh", "disjoint_foreign_tcp_preserved"}
+	"service_identity_protected", "udp22_with_existing_tcp_ssh", "disjoint_foreign_tcp_preserved", "runtime_upgraded"}
 
 func verifyReport(path string) (report, error) {
 	var result report

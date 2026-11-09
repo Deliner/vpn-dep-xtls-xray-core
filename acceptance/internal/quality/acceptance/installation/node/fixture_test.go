@@ -1,6 +1,7 @@
 package node
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,6 +18,23 @@ func require(t *testing.T, err error) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func fixtureRuntime(t *testing.T) (string, string, report) {
+	t.Helper()
+	directory := t.TempDir()
+	raw := make([]byte, 64)
+	copy(raw, "\x7fELF\x02\x01")
+	raw[6] = 1
+	binary.LittleEndian.PutUint16(raw[16:], 2)
+	binary.LittleEndian.PutUint16(raw[18:], 62)
+	binary.LittleEndian.PutUint32(raw[20:], 1)
+	binary.LittleEndian.PutUint16(raw[52:], 64)
+	write(t, filepath.Join(directory, "previous-runtimes/xray"), raw)
+	sha := safeio.Hash(raw)
+	result := report{Runtimes: map[string]runtimeRecord{
+		"client/xray": {SHA: sha, Verified: true}, "server/xray": {SHA: sha, Verified: true}}}
+	return directory, sha, result
 }
 
 func write(t *testing.T, path string, contents []byte) {

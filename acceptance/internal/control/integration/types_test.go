@@ -10,7 +10,6 @@ import (
 	"vpn-script/internal/control/integration/selection"
 	"vpn-script/internal/control/integration/traffic"
 	"vpn-script/internal/core/model"
-	"vpn-script/internal/node/installer"
 )
 
 type origins struct {
@@ -58,6 +57,8 @@ type installedSuite struct {
 	Generations              []string                     `json:"generations"`
 	Phases                   []traffic.Report             `json:"phases"`
 	Runtimes                 map[string]evidence.Runtime  `json:"runtimes"`
+	PreviousRuntimes         map[string]evidence.Runtime  `json:"previous_runtimes,omitempty"`
+	RuntimeUpgraded          bool                         `json:"runtime_upgraded"`
 	UnchangedPID             bool                         `json:"unchanged_pid"`
 	RolledBack               bool                         `json:"rolled_back"`
 	Recovered                bool                         `json:"stopped_service_recovered"`
@@ -96,8 +97,4 @@ var installedFailures = map[string]string{
 	"identity-failed": "unsafe service identity",
 }
 
-type installedRevision struct {
-	State     installer.State
-	Directory string
-	Unit      []byte
-}
+type installedRevision = installation.Revision

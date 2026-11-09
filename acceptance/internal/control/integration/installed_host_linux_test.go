@@ -12,6 +12,7 @@ import (
 	"time"
 	"vpn-script/internal/control/integration/evidence/diagnostics"
 	"vpn-script/internal/control/integration/evidence/installation"
+	"vpn-script/internal/control/integration/evidence/installation/previous"
 	"vpn-script/internal/core/model"
 	"vpn-script/internal/node/installer"
 	"vpn-script/internal/node/manifest"
@@ -53,7 +54,7 @@ func installedPacketTrace(t *testing.T) {
 	t.Cleanup(func() { require(t, stop()) })
 }
 
-func installedCleanup(t *testing.T) {
+func installedCleanup(t *testing.T, report *installedSuite) {
 	t.Helper()
 	if diagnostic, err := safeio.Read(installedBase+"/last-error.log", 65536); err == nil {
 		if err := safeio.Atomic(filepath.Join(filepath.Dir(os.Getenv("NHOP_SYSTEMD_REPORT")), "last-error.log"), diagnostic, 0600); err != nil {
@@ -66,7 +67,7 @@ func installedCleanup(t *testing.T) {
 		return
 	}
 	if !t.Failed() {
-		require(t, installation.CaptureInputs(filepath.Dir(os.Getenv("NHOP_SYSTEMD_REPORT"))))
+		require(t, installation.CaptureInputs(filepath.Dir(os.Getenv("NHOP_SYSTEMD_REPORT")), report.CachedArchives, report.PreviousRuntimes))
 	}
 	for _, path := range []string{installedUnit, installedBase, installedDropin} {
 		if err := os.RemoveAll(path); err != nil {
@@ -100,6 +101,17 @@ func installedConfig(t *testing.T, l *lab) model.NodeConfig {
 	}
 	installedWildcards(&data)
 	return installedDigest(t, data)
+}
+
+func installedInitial(t *testing.T, l *lab) model.NodeConfig {
+	t.Helper()
+	data := installedConfig(t, l)
+	if os.Getenv("NHOP_PREVIOUS_NODE_BINARY") != "" {
+		var err error
+		data, err = previous.Manifest(data)
+		require(t, err)
+	}
+	return data
 }
 
 func installedDigest(t *testing.T, data model.NodeConfig) model.NodeConfig {
@@ -163,36 +175,12 @@ func installedInstallerArgs(path string) []string {
 
 func installedCache(t *testing.T, data model.NodeConfig) (map[string]string, int64) {
 	t.Helper()
-	directory := filepath.Join(installedBase, "cache")
-	info, err := os.Lstat(directory)
-	require(t, err)
-	if !info.IsDir() || info.Mode().Perm() != 0700 {
-		t.Fatal("runtime cache is not a private directory")
-	}
-	programs := engines.Programs(data)
-	entries, err := os.ReadDir(directory)
-	require(t, err)
-	if len(entries) != len(programs) {
-		t.Fatal("runtime cache has missing or unexpected entries")
-	}
 	arch, err := installer.Architecture()
 	require(t, err)
-	hashes, size := map[string]string{}, int64(0)
-	for _, program := range programs {
-		asset := program.Runtime.Assets[arch]
-		path := filepath.Join(directory, asset.SHA256+".archive")
-		info, err := os.Lstat(path)
-		require(t, err)
-		if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != asset.Size {
-			t.Fatal("runtime cache entry type, permissions or size differ")
-		}
-		hashes[program.Name], err = safeio.FileHash(path)
-		require(t, err)
-		if hashes[program.Name] != asset.SHA256 {
-			t.Fatal("runtime cache entry checksum differs")
-		}
-		size += info.Size()
-	}
+	assets, err := installation.CacheAssets(data, arch, os.Getenv("NHOP_PREVIOUS_NODE_BINARY") != "")
+	require(t, err)
+	hashes, size, err := installation.CacheSnapshot(filepath.Join(installedBase, "cache"), assets)
+	require(t, err)
 	return hashes, size
 }
 

@@ -15,7 +15,6 @@ import (
 	"vpn-script/internal/control/integration/evidence/installation"
 	"vpn-script/internal/core/dag"
 	"vpn-script/internal/core/model"
-	"vpn-script/internal/node/release"
 	"vpn-script/internal/platform/safeio"
 )
 
@@ -27,7 +26,7 @@ func TestInstalledNodeLifecycle(t *testing.T) {
 	t.Cleanup(func() { saveInstalledReport(t, &report) })
 	installedGuard(t)
 	installedPacketTrace(t)
-	t.Cleanup(func() { installedCleanup(t) })
+	t.Cleanup(func() { installedCleanup(t, &report) })
 	t.Setenv("NHOP_SYSTEMD_INSTALLER_PROXY", "")
 	binary := os.Getenv("NHOP_NODE_BINARY")
 	if previous := os.Getenv("NHOP_PREVIOUS_NODE_BINARY"); previous != "" {
@@ -38,7 +37,7 @@ func TestInstalledNodeLifecycle(t *testing.T) {
 	l := matrixPrepare(t, 1)
 	installedPublicPorts(t, l)
 	report.Profiles = dag.Keys(l.topology.Routes)
-	initial := installedConfig(t, l)
+	initial := installedInitial(t, l)
 	installedApply(t, initial, "applied")
 	report.Generations = append(report.Generations, initial.Generation)
 	report.ReleaseIDs = append(report.ReleaseIDs, filepath.Base(installedPath(t)))
@@ -54,10 +53,10 @@ func TestInstalledNodeLifecycle(t *testing.T) {
 	report.WildcardListeners = installedWildcardTags(t, initial)
 	installedUnchanged(t, initial)
 	report.UnchangedPID = true
-	installedUpgrade(t, l, initial, binary, &report)
+	initial = installedUpgrade(t, l, initial, binary, &report)
 	installedAccessControls(t, l, initial, &report)
 	installedUpdateOffline(t, l, initial, &report)
-	require(t, evidence.Verify(report.Runtimes))
+	require(t, installation.VerifyRuntimeHistory(report.Runtimes, report.PreviousRuntimes))
 }
 
 func installedUpdateOffline(t *testing.T, l *lab, initial model.NodeConfig, report *installedSuite) {
@@ -204,37 +203,36 @@ func installedRollback(t *testing.T, l *lab, updated model.NodeConfig, report *i
 	report.RolledBack = true
 }
 
-func installedUpgrade(t *testing.T, l *lab, data model.NodeConfig, binary string, report *installedSuite) {
+func installedUpgrade(t *testing.T, l *lab, data model.NodeConfig, binary string, report *installedSuite) model.NodeConfig {
 	t.Helper()
 	if os.Getenv("NHOP_PREVIOUS_NODE_BINARY") == "" {
 		t.Log("installer upgrade not exercised: provide a previous Linux installer and its SHA-256")
-		return
+		return data
 	}
 	before := installedCheckpoint(t, data)
 	report.PreviousSHA = before.State.Files["nhop-node"]
 	var err error
-	report.InstallerSHA, err = safeio.FileHash(binary)
+	report.InstallerSHA, err = installation.UpgradeSupervisor(report.PreviousSHA, binary)
 	require(t, err)
-	if report.PreviousSHA == report.InstallerSHA {
-		t.Fatal("upgrade requires different previous/current installer bytes")
-	}
 	t.Setenv("NHOP_NODE_BINARY", binary)
-	installedUpgradeFailure(t, l, data, before, report)
-	installedApply(t, data, "applied")
-	after := installedCheckpoint(t, data)
-	if before.Directory == after.Directory || after.State.PreviousReleaseID != filepath.Base(before.Directory) || after.State.PreviousGeneration != data.Generation || after.State.Files["nhop-node"] != report.InstallerSHA {
-		t.Fatal("same-configuration upgrade lost release history or kept the old supervisor")
-	}
-	retained, err := release.Inventory(before.Directory, data)
+	current := installedConfig(t, l)
+	installedUpgradeFailure(t, l, current, data, before, report)
+	require(t, installation.RetainRuntimes(report.Runtimes, before.Directory))
+	report.PreviousRuntimes = report.Runtimes
+	installedApply(t, current, "applied")
+	after := installedCheckpoint(t, current)
+	require(t, installation.VerifyUpgrade(before, after, data, report.InstallerSHA))
+	report.Runtimes, err = evidence.Capture(context.Background(), l.runtimes.Inputs)
 	require(t, err)
-	if !reflect.DeepEqual(retained, before.State.Files) {
-		t.Fatal("installer upgrade modified the retained previous release")
-	}
+	require(t, installation.RuntimeTransition(report.PreviousRuntimes, report.Runtimes))
+	report.RuntimeUpgraded = true
 	report.Upgraded, report.Migrated = true, before.State.ReleaseID == ""
+	report.Generations = append(report.Generations, current.Generation)
 	report.ReleaseIDs = append(report.ReleaseIDs, after.State.ReleaseID)
 	installedTraffic(t, l, "installer-upgraded", report)
-	installedUnchanged(t, data)
-	installedUnitRepair(t, l, data, before.Unit, after, report)
+	installedUnchanged(t, current)
+	installedUnitRepair(t, l, current, before.Unit, after, report)
+	return current
 }
 
 func installedUnitRepair(t *testing.T, l *lab, data model.NodeConfig, previous []byte, current installedRevision, report *installedSuite) {
@@ -255,14 +253,14 @@ func installedUnitRepair(t *testing.T, l *lab, data model.NodeConfig, previous [
 	installedUnchanged(t, data)
 }
 
-func installedUpgradeFailure(t *testing.T, l *lab, data model.NodeConfig, previous installedRevision, report *installedSuite) {
+func installedUpgradeFailure(t *testing.T, l *lab, data, prior model.NodeConfig, previous installedRevision, report *installedSuite) {
 	t.Helper()
 	pid := installedCommand(t, "systemctl", "show", "-p", "MainPID", "--value", "vpn-nhop.service")
 	before, err := os.ReadFile(installedBase + "/state.json")
 	require(t, err)
 	reset := installedRejectNewSupervisor(t, previous)
 	installedApply(t, data, "start-failed")
-	after := installedCheckpoint(t, data)
+	after := installedCheckpoint(t, prior)
 	state, err := os.ReadFile(installedBase + "/state.json")
 	require(t, err)
 	if after.Directory != previous.Directory || !bytes.Equal(before, state) || !bytes.Equal(after.Unit, previous.Unit) {
