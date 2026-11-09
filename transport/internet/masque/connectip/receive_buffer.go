@@ -18,6 +18,16 @@ type datagramReceiveBudget interface {
 	CancelWrite(quic.StreamErrorCode)
 }
 
+// ConfigureQUICReceive bounds the shared connection queue before any incoming
+// packet can be handled. It matches one CONNECT-IP stream's finite burst budget;
+// multiple streams share this connection-wide cap rather than multiplying it.
+func ConfigureQUICReceive(config *quic.Config) error {
+	if err := config.SetDatagramReceiveBuffer(maxBufferedIPDatagrams, maxBufferedIPBytes); err != nil {
+		return fmt.Errorf("connect-ip: failed to set QUIC receive budget: %w", err)
+	}
+	return nil
+}
+
 // Each authenticated CONNECT-IP stream owns one finite burst budget. Other
 // HTTP/3 streams retain their default queue, and HTTP/2 capsule bounds are
 // unchanged. Configure before address assignment / exchanging IP packets.

@@ -68,6 +68,9 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 		EnableDatagrams:                true,
 		DisablePathManager:             true,
 	}
+	if err := connectip.ConfigureQUICReceive(quicConfig); err != nil {
+		return nil, err
+	}
 	if quicParams.MaxIdleTimeout == 0 {
 		quicConfig.MaxIdleTimeout = 30 * time.Second
 	}

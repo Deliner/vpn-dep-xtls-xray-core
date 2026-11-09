@@ -113,6 +113,9 @@ func (l *Listener) listenHTTP3(address net.Address, port net.Port, streamSetting
 		EnableDatagrams:                true,
 		DisablePathManager:             true,
 	}
+	if err := connectip.ConfigureQUICReceive(quicConfig); err != nil {
+		return err
+	}
 	if quicParams.MaxIdleTimeout == 0 {
 		quicConfig.MaxIdleTimeout = 30 * time.Second
 	}
